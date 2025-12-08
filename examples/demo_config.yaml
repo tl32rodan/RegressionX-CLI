@@ -1,0 +1,49 @@
+schema_version: 1
+
+paths:
+  workspace_root: "demo/work/{case_id}/{version}"
+  artifacts_root: "demo/artifacts/{case_id}/{version}"
+
+versions:
+  baseline: "baseline"
+  candidate: "candidate"
+
+cmd_templates:
+  preprocess: |
+    python - <<'PY'
+    from pathlib import Path
+    root = Path('{workspace_root}')
+    root.mkdir(parents=True, exist_ok=True)
+    (root / 'note.txt').write_text('prep-{case_id}-{version}')
+    PY
+  run: |
+    python - <<'PY'
+    from pathlib import Path
+    root = Path('{artifacts_root}')
+    root.mkdir(parents=True, exist_ok=True)
+    (root / 'artifact.txt').write_text('{params.cell}-{version}')
+    PY
+
+filters:
+  include:
+    - "**/*"
+  ignore:
+    - "**/note.txt"
+  extra_ignore_allowed: true
+
+reporting:
+  global_report: "demo/reports/global"
+  case_report: "demo/reports/cases/{case_id}"
+  formats: [json]
+
+cases:
+  - case_id: adder_case
+    params:
+      cell: adder
+    metadata:
+      owner: demo
+  - case_id: multiplier_case
+    params:
+      cell: mult
+    metadata:
+      owner: demo
