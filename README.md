@@ -15,13 +15,23 @@ No external dependencies are required beyond Python 3.11+ and `pytest` for tests
 Use `make run` to execute the CLI. Pass additional arguments via `ARGS`:
 
 ```bash
-make run ARGS="run --config examples/demo_config.yaml"
+make run ARGS="run --config examples/demo_config.json"
 ```
 
 Reports are written to the locations defined in your config (`demo/reports` in the demo file). To run a specific case:
 
 ```bash
-make run ARGS="run --config examples/demo_config.yaml --case adder_case"
+make run ARGS="run --config examples/demo_config.json --case adder_case"
+```
+
+### Demo run
+
+The demo config now uses a generated `csh` script as the target command, producing nested output files under
+`demo/artifacts`. Run the demo and clean it up with:
+
+```bash
+make demo
+make clean
 ```
 
 ### Validation
@@ -29,7 +39,7 @@ make run ARGS="run --config examples/demo_config.yaml --case adder_case"
 Check configuration validity without executing cases:
 
 ```bash
-make run ARGS="validate --config examples/demo_config.yaml"
+make run ARGS="validate --config examples/demo_config.json"
 ```
 
 ### Testing (TDD workflow)
@@ -44,4 +54,4 @@ make test
 
 * `docs/architecture.md` – core architecture, lifecycle, configuration layers, and reporting design.
 * `examples/config.example.yaml` – sample global configuration illustrating template-driven workflows and reporting options.
-* `examples/demo_config.yaml` – runnable demo showcasing the CLI with generated artifacts and reports.
+* `examples/demo_config.json` – runnable demo showcasing the CLI with generated artifacts and reports.

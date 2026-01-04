@@ -15,14 +15,24 @@ cmd_templates:
     root = Path('{workspace_root}')
     root.mkdir(parents=True, exist_ok=True)
     (root / 'note.txt').write_text('prep-{case_id}-{version}')
+    script = root / 'run_demo.csh'
+    script.write_text(
+        "#!/bin/csh\n"
+        "set artifacts_root=\"$1\"\n"
+        "set case_id=\"$2\"\n"
+        "set version_label=\"$3\"\n"
+        "set nested_dir=\"$artifacts_root/outputs/$case_id/$version_label\"\n"
+        "mkdir -p \"$nested_dir/detail\"\n"
+        "echo \"${case_id}-${version_label}\" > \"$nested_dir/result.txt\"\n"
+        "echo \"detail-${version_label}\" > \"$nested_dir/detail/info.txt\"\n"
+        "set summary_dir=\"$artifacts_root/summary/$version_label\"\n"
+        "mkdir -p \"$summary_dir\"\n"
+        "echo \"summary-${case_id}-${version_label}\" > \"$summary_dir/summary.txt\"\n"
+    )
+    script.chmod(0o755)
     PY
   run: |
-    python - <<'PY'
-    from pathlib import Path
-    root = Path('{artifacts_root}')
-    root.mkdir(parents=True, exist_ok=True)
-    (root / 'artifact.txt').write_text('{params.cell}-{version}')
-    PY
+    csh {workspace_root}/run_demo.csh "{artifacts_root}" "{case_id}" "{version_label}"
 
 filters:
   include:
