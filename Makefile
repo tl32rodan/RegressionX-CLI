@@ -9,7 +9,7 @@ test:
 	$(PYTHON) -m pytest $(ARGS)
 
 demo:
-	$(PYTHON) -m regressionx.cli run --config examples/demo_config.json
+	$(PYTHON) -m regressionx.cli run --config examples/config.example.yaml
 
 clean:
 	rm -rf demo
