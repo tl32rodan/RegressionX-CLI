@@ -1,16 +1,17 @@
-import json
 import subprocess
 from pathlib import Path
 
 import pytest
+yaml = pytest.importorskip("yaml")
 
+from regressionx import config as config_module
 from regressionx.config import load_config
-from regressionx.runner import RegressionRunner
 from regressionx.reporting import ReportBuilder
+from regressionx.runner import RegressionRunner
 
 
-def write_config(tmp_path: Path) -> Path:
-    config = {
+def build_config(tmp_path: Path) -> dict:
+    return {
         "schema_version": 1,
         "paths": {
             "workspace_root": str(tmp_path / "work" / "{case_id}" / "{version}"),
@@ -18,8 +19,18 @@ def write_config(tmp_path: Path) -> Path:
         },
         "versions": {"baseline": "left", "candidate": "right"},
         "cmd_templates": {
-            "preprocess": "python - <<'PY'\nfrom pathlib import Path\nroot = Path('{workspace_root}')\nroot.mkdir(parents=True, exist_ok=True)\n(root / 'prep.txt').write_text('{case_id}-{version}')\nPY",
-            "run": "python - <<'PY'\nfrom pathlib import Path\nroot = Path('{artifacts_root}')\nroot.mkdir(parents=True, exist_ok=True)\n(root / 'payload.txt').write_text('{params.cell}-{version}')\nPY",
+            "preprocess": (
+                "python -c \"from pathlib import Path; "
+                "root = Path('{workspace_root}'); "
+                "root.mkdir(parents=True, exist_ok=True); "
+                "(root / 'prep.txt').write_text('{case_id}-{version}')\""
+            ),
+            "run": (
+                "python -c \"from pathlib import Path; "
+                "root = Path('{artifacts_root}'); "
+                "root.mkdir(parents=True, exist_ok=True); "
+                "(root / 'payload.txt').write_text('{params_cell}-{version}')\""
+            ),
         },
         "filters": {
             "include": ["**/*"],
@@ -45,22 +56,35 @@ def write_config(tmp_path: Path) -> Path:
             },
         ],
     }
+
+
+def write_config(tmp_path: Path, config: dict) -> Path:
     path = tmp_path / "regressionx.yaml"
-    path.write_text(json.dumps(config))
+    path.write_text(yaml.safe_dump(config, sort_keys=False))
     return path
 
 
-def test_load_config_validates_required_sections(tmp_path):
-    cfg_path = write_config(tmp_path)
-    config = load_config(cfg_path)
+@pytest.fixture
+def regression_config_path(tmp_path: Path) -> Path:
+    return write_config(tmp_path, build_config(tmp_path))
+
+
+def require_jsonschema() -> None:
+    if config_module.jsonschema is None:
+        pytest.skip("jsonschema is required for schema validation tests")
+
+
+def test_load_config_validates_required_sections(regression_config_path):
+    require_jsonschema()
+    config = load_config(regression_config_path)
     assert config.schema_version == 1
     assert config.versions == {"baseline": "left", "candidate": "right"}
     assert len(config.cases) == 2
 
 
-def test_run_generates_case_and_global_reports(tmp_path):
-    cfg_path = write_config(tmp_path)
-    config = load_config(cfg_path)
+def test_run_generates_case_and_global_reports(regression_config_path, tmp_path):
+    require_jsonschema()
+    config = load_config(regression_config_path)
     runner = RegressionRunner(config)
     results = runner.run_all()
 
@@ -78,11 +102,11 @@ def test_run_generates_case_and_global_reports(tmp_path):
 
 
 @pytest.mark.parametrize("missing_key", ["versions", "paths", "cmd_templates", "cases"])
-def test_missing_required_section_raises(tmp_path, missing_key):
-    cfg_path = write_config(tmp_path)
-    data = json.loads(cfg_path.read_text())
+def test_missing_required_section_raises(regression_config_path, missing_key):
+    require_jsonschema()
+    data = yaml.safe_load(regression_config_path.read_text())
     data.pop(missing_key)
-    cfg_path.write_text(json.dumps(data))
+    regression_config_path.write_text(yaml.safe_dump(data, sort_keys=False))
 
     with pytest.raises(ValueError):
-        load_config(cfg_path)
+        load_config(regression_config_path)

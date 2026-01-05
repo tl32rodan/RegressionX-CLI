@@ -29,26 +29,18 @@ class CaseResult:
 
 
 class TemplateResolver:
-    def __init__(self, base_context: Dict[str, Any]):
-        self.base_context = base_context
+    def __init__(self, context: Dict[str, Any], allowed_keys: set[str]):
+        self.context = context
+        self.allowed_keys = allowed_keys
 
     def render(self, template: str) -> str:
-        formatter = _DotFormatter()
-        return formatter.vformat(template, args=(), kwargs=self.base_context)
-
-
-class _DotFormatter(string.Formatter):
-    def get_field(self, field_name, args, kwargs):  # pragma: no cover - exercised via render
-        return self._resolve(field_name, kwargs), field_name
-
-    def _resolve(self, expr: str, ctx: Dict[str, Any]):
-        value: Any = ctx
-        for part in expr.split('.'):
-            if isinstance(value, dict):
-                value = value[part]
-            else:
-                value = getattr(value, part)
-        return value
+        formatter = string.Formatter()
+        for field_name, *_ in formatter.parse(template):
+            if field_name is None:
+                continue
+            if field_name not in self.allowed_keys:
+                raise ValueError(f"Unsupported template field: {field_name}")
+        return formatter.vformat(template, args=(), kwargs=self.context)
 
 
 class RegressionRunner:
@@ -67,23 +59,53 @@ class RegressionRunner:
 
         try:
             artifact_paths: Dict[str, Path] = {}
+            case_contexts = {}
             for version, version_label in self.config.versions.items():
                 context = self._context_for(case, version, version_label)
-                resolver = TemplateResolver(context)
-                workspace_root = Path(resolver.render(self.config.paths["workspace_root"]))
-                artifacts_root = Path(resolver.render(self.config.paths["artifacts_root"]))
-                context = {**context, "workspace_root": str(workspace_root), "artifacts_root": str(artifacts_root)}
-                resolver = TemplateResolver(context)
+                workspace_root = Path(context["workspace_root"])
+                artifacts_root = Path(context["artifacts_root"])
                 artifact_paths[version] = artifacts_root
-
                 workspace_root.mkdir(parents=True, exist_ok=True)
                 artifacts_root.mkdir(parents=True, exist_ok=True)
+                case_contexts[version] = (context, workspace_root, artifacts_root)
 
-                if "preprocess" in self.config.cmd_templates:
-                    cmd = resolver.render(self.config.cmd_templates["preprocess"])
-                    commands.append(self._execute_command(cmd, workspace_root, version))
-                cmd = resolver.render(self.config.cmd_templates.get("run", ""))
-                commands.append(self._execute_command(cmd, workspace_root, version, env={"ARTIFACTS_ROOT": str(artifacts_root)}))
+            for template_key in ("preprocess", "run", "postprocess"):
+                template = self.config.cmd_templates.get(template_key)
+                if not template:
+                    continue
+                for version, (context, workspace_root, artifacts_root) in case_contexts.items():
+                    resolver = TemplateResolver(context, set(context.keys()))
+                    cmd = resolver.render(template)
+                    commands.append(
+                        self._execute_command(
+                            cmd,
+                            workspace_root,
+                            version,
+                            env={"ARTIFACTS_ROOT": str(artifacts_root)},
+                        )
+                    )
+
+            compare_template = self.config.cmd_templates.get("compare")
+            if compare_template:
+                compare_context = self._compare_context(case, case_contexts)
+                resolver = TemplateResolver(compare_context, set(compare_context.keys()))
+                cmd = resolver.render(compare_template)
+                compare_workdir = (
+                    compare_context.get("workspace_root_baseline")
+                    or compare_context.get("workspace_root_candidate")
+                    or str(next(iter(case_contexts.values()))[1])
+                )
+                commands.append(
+                    self._execute_command(
+                        cmd,
+                        Path(compare_workdir),
+                        "compare",
+                        env={
+                            "ARTIFACTS_ROOT_BASELINE": compare_context.get("artifacts_root_baseline", ""),
+                            "ARTIFACTS_ROOT_CANDIDATE": compare_context.get("artifacts_root_candidate", ""),
+                        },
+                    )
+                )
 
             left = artifact_paths.get("baseline") or artifact_paths.get("left")
             right = artifact_paths.get("candidate") or artifact_paths.get("right")
@@ -123,13 +145,58 @@ class RegressionRunner:
         )
 
     def _context_for(self, case: CaseConfig, version: str, version_label: str) -> Dict[str, Any]:
-        return {
+        context = {
             "case_id": case.case_id,
             "version": version,
             "version_label": version_label,
-            "params": case.params,
-            "metadata": case.metadata,
+            "workspace_root": self.config.paths["workspace_root"].format(
+                case_id=case.case_id,
+                version=version,
+                version_label=version_label,
+            ),
+            "artifacts_root": self.config.paths["artifacts_root"].format(
+                case_id=case.case_id,
+                version=version,
+                version_label=version_label,
+            ),
         }
+        for key, value in case.params.items():
+            context[f"params_{key}"] = value
+        for key, value in case.metadata.items():
+            context[f"metadata_{key}"] = value
+        return context
+
+    def _compare_context(self, case: CaseConfig, case_contexts: Dict[str, tuple[Dict[str, Any], Path, Path]]) -> Dict[str, Any]:
+        context: Dict[str, Any] = {
+            "case_id": case.case_id,
+        }
+        for key, value in case.params.items():
+            context[f"params_{key}"] = value
+        for key, value in case.metadata.items():
+            context[f"metadata_{key}"] = value
+        baseline = case_contexts.get("baseline")
+        candidate = case_contexts.get("candidate")
+        if baseline:
+            base_context, workspace_root, artifacts_root = baseline
+            context.update(
+                {
+                    "workspace_root_baseline": str(workspace_root),
+                    "artifacts_root_baseline": str(artifacts_root),
+                    "version_baseline": base_context["version"],
+                    "version_label_baseline": base_context["version_label"],
+                }
+            )
+        if candidate:
+            cand_context, workspace_root, artifacts_root = candidate
+            context.update(
+                {
+                    "workspace_root_candidate": str(workspace_root),
+                    "artifacts_root_candidate": str(artifacts_root),
+                    "version_candidate": cand_context["version"],
+                    "version_label_candidate": cand_context["version_label"],
+                }
+            )
+        return context
 
     def _compare_artifacts(self, left_dir: Path, right_dir: Path, case: CaseConfig) -> Iterable[str]:
         include_patterns = self.config.filters.get("include", [])
