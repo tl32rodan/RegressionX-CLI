@@ -115,6 +115,16 @@
         }
       }
     },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout_seconds": {
+          "type": "number",
+          "minimum": 1
+        }
+      }
+    },
     "cases": {
       "type": "array",
       "items": {

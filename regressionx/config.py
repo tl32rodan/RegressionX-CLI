@@ -31,6 +31,7 @@ class Config:
     filters: Dict[str, Any]
     reporting: Dict[str, Any]
     cases: List[CaseConfig]
+    execution: Dict[str, Any] = field(default_factory=dict)
 
 
 REQUIRED_KEYS = ["schema_version", "paths", "versions", "cmd_templates", "filters", "reporting", "cases"]
@@ -107,5 +108,6 @@ def load_config(path: Path) -> Config:
         cmd_templates=data["cmd_templates"],
         filters=data["filters"],
         reporting=data["reporting"],
+        execution=data.get("execution", {}),
         cases=cases,
     )
