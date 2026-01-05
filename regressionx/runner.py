@@ -17,6 +17,8 @@ class CommandExecution:
     succeeded: bool
     returncode: int
     stderr: str = ""
+    stdout: str = ""
+    timed_out: bool = False
 
 
 @dataclass
@@ -26,6 +28,8 @@ class CaseResult:
     differences: List[str]
     commands: List[CommandExecution] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
+    params: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class TemplateResolver:
@@ -112,7 +116,16 @@ class RegressionRunner:
             differences = []
             if left and right:
                 differences = sorted(self._compare_artifacts(left, right, case))
-            status = "PASS" if not differences else "FAIL"
+            failures = [cmd for cmd in commands if not cmd.succeeded]
+            if failures:
+                for cmd in failures:
+                    suffix = " (timeout)" if cmd.timed_out else ""
+                    errors.append(
+                        f"Command failed{suffix}: {cmd.command} (version={cmd.version}, code={cmd.returncode})"
+                    )
+                status = "FAILURE"
+            else:
+                status = "PASS" if not differences else "FAIL"
         except Exception as exc:  # pragma: no cover - captured for reporting
             errors.append(str(exc))
             status = "ERROR"
@@ -124,24 +137,76 @@ class RegressionRunner:
             differences=differences,
             commands=commands,
             errors=errors,
+            params=case.params,
+            metadata=case.metadata,
         )
 
     def _execute_command(self, command: str, workdir: Path, version: str, env: Dict[str, str] | None = None) -> CommandExecution:
         env_vars = {**{k: str(v) for k, v in (env or {}).items()}, "REGX_VERSION": version}
-        proc = subprocess.run(
-            command,
-            cwd=workdir,
-            shell=True,
-            env={**os.environ, **env_vars},
-            capture_output=True,
-            text=True,
-        )
-        return CommandExecution(
-            version=version,
-            command=command,
-            succeeded=proc.returncode == 0,
-            returncode=proc.returncode,
-            stderr=proc.stderr.strip(),
+        timeout_seconds = self.config.execution.get("timeout_seconds")
+        try:
+            proc = subprocess.run(
+                command,
+                cwd=workdir,
+                shell=True,
+                env={**os.environ, **env_vars},
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
+            return CommandExecution(
+                version=version,
+                command=command,
+                succeeded=proc.returncode == 0,
+                returncode=proc.returncode,
+                stderr=proc.stderr.strip(),
+                stdout=proc.stdout.strip(),
+            )
+        except subprocess.TimeoutExpired as exc:
+            stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+            stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+            if timeout_seconds:
+                stderr = (stderr.strip() + "\n" if stderr.strip() else "") + f"Timed out after {timeout_seconds}s"
+            return CommandExecution(
+                version=version,
+                command=command,
+                succeeded=False,
+                returncode=-1,
+                stderr=stderr.strip(),
+                stdout=stdout.strip(),
+                timed_out=True,
+            )
+
+    def report_from_artifacts(self, cases: Iterable[CaseConfig] | None = None) -> List[CaseResult]:
+        results: List[CaseResult] = []
+        for case in cases or self.config.cases:
+            results.append(self._report_case(case))
+        return results
+
+    def _report_case(self, case: CaseConfig) -> CaseResult:
+        errors: List[str] = []
+        artifact_paths: Dict[str, Path] = {}
+        for version, version_label in self.config.versions.items():
+            context = self._context_for(case, version, version_label)
+            artifacts_root = Path(context["artifacts_root"])
+            artifact_paths[version] = artifacts_root
+            if not artifacts_root.exists():
+                errors.append(f"Missing artifacts for {version}: {artifacts_root}")
+
+        left = artifact_paths.get("baseline") or artifact_paths.get("left")
+        right = artifact_paths.get("candidate") or artifact_paths.get("right")
+        differences: List[str] = []
+        if left and right and left.exists() and right.exists():
+            differences = sorted(self._compare_artifacts(left, right, case))
+        status = "ERROR" if errors else ("PASS" if not differences else "FAIL")
+        return CaseResult(
+            case_id=case.case_id,
+            status=status,
+            differences=differences,
+            commands=[],
+            errors=errors,
+            params=case.params,
+            metadata=case.metadata,
         )
 
     def _context_for(self, case: CaseConfig, version: str, version_label: str) -> Dict[str, Any]:

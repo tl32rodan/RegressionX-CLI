@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regressionx.dev/schemas/regression_case_report.schema.json",
+  "title": "RegressionX Case Report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at",
+    "case_id",
+    "status",
+    "differences",
+    "errors",
+    "commands",
+    "params",
+    "metadata"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string"
+    },
+    "differences": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["version", "command", "succeeded", "returncode", "stderr", "stdout", "timed_out"],
+        "additionalProperties": false,
+        "properties": {
+          "version": { "type": "string" },
+          "command": { "type": "string" },
+          "succeeded": { "type": "boolean" },
+          "returncode": { "type": "integer" },
+          "stderr": { "type": "string" },
+          "stdout": { "type": "string" },
+          "timed_out": { "type": "boolean" }
+        }
+      }
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

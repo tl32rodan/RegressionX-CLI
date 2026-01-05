@@ -5,6 +5,7 @@ from pathlib import Path
 from .config import ConfigError, load_config
 from .reporting import ReportBuilder
 from .runner import RegressionRunner
+from .maintenance import clean_paths
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -17,6 +18,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     validate_parser = subparsers.add_parser("validate", help="Validate configuration")
     validate_parser.add_argument("--config", type=Path, default=Path("regressionx.yaml"))
+
+    report_parser = subparsers.add_parser("report", help="Regenerate reports from artifacts")
+    report_parser.add_argument("--config", type=Path, default=Path("regressionx.yaml"))
+    report_parser.add_argument("--case", action="append", help="Report a specific case by id")
+
+    clean_parser = subparsers.add_parser("clean", help="Clean workspaces, artifacts, and reports")
+    clean_parser.add_argument("--config", type=Path, default=Path("regressionx.yaml"))
 
     return parser
 
@@ -40,8 +48,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     selected_cases = config.cases
-    if args.case:
+    if getattr(args, "case", None):
         selected_cases = [case for case in config.cases if case.case_id in args.case]
+
+    if args.command == "report":
+        runner = RegressionRunner(config)
+        results = runner.report_from_artifacts(selected_cases)
+        reports = ReportBuilder(config, results)
+        reports.write_reports()
+        return 0
+
+    if args.command == "clean":
+        clean_paths(config)
+        print("Cleaned RegressionX artifacts and reports")
+        return 0
 
     runner = RegressionRunner(config)
     runner.config.cases = selected_cases
