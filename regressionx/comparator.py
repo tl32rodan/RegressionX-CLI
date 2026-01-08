@@ -43,15 +43,15 @@ def compare_directories(baseline: Path, candidate: Path) -> ComparatorResult:
     # We use filecmp.dircmp. However, it's not fully recursive in one shot, 
     # we need to traverse.
     
-    def _recursive_cmp(dcmp):
+    def _recursive_cmp(dcmp, rel_path=Path(".")):
         # 1. Structural checks
         for name in dcmp.left_only:
             result.match = False
-            result.errors.append(f"Only in baseline: {name}")
+            result.errors.append(f"Only in baseline: {rel_path / name}")
             
         for name in dcmp.right_only:
             result.match = False
-            result.errors.append(f"Only in candidate: {name}")
+            result.errors.append(f"Only in candidate: {rel_path / name}")
             
         # 2. Content checks (for files in both)
         # dcmp.diff_files only checks shallow unless we verify content.
@@ -62,11 +62,11 @@ def compare_directories(baseline: Path, candidate: Path) -> ComparatorResult:
             path_b = Path(dcmp.right) / name
             if not filecmp.cmp(path_a, path_b, shallow=False):
                 result.match = False
-                result.diffs.append(f"Content mismatch: {name}")
+                result.diffs.append(f"Content mismatch: {rel_path / name}")
                 
         # 3. Recurse into subdirectories
-        for sub_dcmp in dcmp.subdirs.values():
-            _recursive_cmp(sub_dcmp)
+        for sub_name, sub_dcmp in dcmp.subdirs.items():
+            _recursive_cmp(sub_dcmp, rel_path / sub_name)
             
     dcmp = filecmp.dircmp(str(baseline), str(candidate))
     _recursive_cmp(dcmp)

@@ -68,13 +68,20 @@ options:
 
 ## Development
 
-This project uses **Test-Driven Development (TDD)**.
+This project uses **Test-Driven Development (TDD)** and provides a `Makefile` for common tasks.
 
 -   **Run Tests**:
     ```bash
     make test
     # or
     python -m unittest discover tests
+    ```
+
+-   **Run Demos**:
+    ```bash
+    make demo          # Run passing demo
+    make demo-fail     # Run failing demo
+    make demo-nested   # Run nested output demo
     ```
 
 -   **Clean Artifacts**:
