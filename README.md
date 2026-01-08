@@ -1,56 +1,83 @@
-# RegressionX CLI
+# RegressionX-CLI
 
-RegressionX CLI is a regression-comparison platform aimed at running the same regression case against two code versions and producing consistent, template-driven reports. The platform is built around the principle that **cases are data, not processes**: all process logic lives in shared templates, while cases only provide the minimum parameters needed to differentiate runs.
+**The "Standard Library First" A/B Regression Tool.**
 
-## Getting started (MVP)
+RegressionX is a lightweight, zero-dependency Python tool designed to run A/B regression tests. It compares the output of two command versions (Baseline vs Candidate) by executing them in isolated "sandboxes" and strictly verifying their output directories.
 
-The initial CLI implementation focuses on running two versions of each case, producing case-level and global reports, and keeping per-case configuration minimal.
+## Key Features
 
-### Installation
+- **A/B Testing**: Runs two versions of a command side-by-side (`old_tool` vs `new_tool`).
+- **Sandboxing**: Creates isolated temporary directories for each case. Safe for tools with unpredictable output paths.
+- **Python-as-Config**: Use the full power of Python to define your test cases and templates.
+- **Markdown Reporting**: Generates simple, grep-friendly `.md` reports suitable for LSF logs and Git.
+- **Zero Dependencies**: Requires only Python 3. No `pip install` needed.
 
-RegressionX requires Python 3.11+ and PyYAML. `pytest` is used for tests, and `jsonschema` is optional for schema validation.
-Commands below assume you are in the project root.
+## Quick Start
 
-### Running regressions
+1.  **Define your configuration** (e.g., `examples/factory_config.py`):
 
-Use `make run` to execute the CLI. Pass additional arguments via `ARGS`:
+    ```python
+    from regressionx import Template
+
+    # run_logic defines the shape of the command
+    run_logic = Template(
+        baseline_command="python old_script.py {args}",
+        candidate_command="python new_script.py {args}",
+    )
+
+    # generate creates the list of cases
+    cases = run_logic.generate([
+        {"name": "test_fast", "args": "--mode fast"},
+        {"name": "test_slow", "args": "--mode slow"},
+    ])
+    ```
+
+2.  **Run the regression**:
+
+    ```bash
+    # Linux / Git Bash
+    python bin/regressionX run --config examples/factory_config.py
+
+    # Windows (PowerShell)
+    python bin/regressionX run --config examples/factory_config.py
+    ```
+
+3.  **View the Report**:
+
+    Check `regression_report.md` (generated in CWD by default).
+
+    ```markdown
+    # RegressionX Report
+    **Total:** 2 | **Passed:** 1 | **Failed:** 1
+
+    ## Failure Details
+    ### test_slow
+    - [Content] Content mismatch: output.log
+    ```
+
+## CLI Options
 
 ```bash
-make run ARGS="run --config examples/config.example.yaml"
+usage: regressionX run [-h] --config CONFIG [--report REPORT]
+
+options:
+  -h, --help       show this help message and exit
+  --config CONFIG  Path to config file (required)
+  --report REPORT  Path to generate Markdown report (default: regression_report.md)
 ```
 
-Reports are written to the locations defined in your config (`demo/reports` in the demo file). To run a specific case:
+## Development
 
-```bash
-make run ARGS="run --config examples/config.example.yaml --case adder_case"
-```
+This project uses **Test-Driven Development (TDD)**.
 
-### Demo run
+-   **Run Tests**:
+    ```bash
+    make test
+    # or
+    python -m unittest discover tests
+    ```
 
-The demo config uses inline Python commands to produce output files under `demo/artifacts`. Run the demo and clean it up with:
-
-```bash
-make demo
-make clean
-```
-
-### Validation
-
-Check configuration validity without executing cases:
-
-```bash
-make run ARGS="validate --config examples/config.example.yaml"
-```
-
-### Testing (TDD workflow)
-
-The repository includes unit tests that drive the implementation. Run them with:
-
-```bash
-make test
-```
-
-### Documentation
-
-* `docs/architecture.md` – core architecture, lifecycle, configuration layers, and reporting design.
-* `examples/config.example.yaml` – runnable demo showcasing the CLI with generated artifacts and reports.
+-   **Clean Artifacts**:
+    ```bash
+    make clean
+    ```
