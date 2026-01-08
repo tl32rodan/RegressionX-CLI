@@ -1,15 +1,13 @@
-.PHONY: test run lint demo clean
+.PHONY: test run clean demo
 
-PYTHON?=python3
-
-run:
-	$(PYTHON) -m regressionx.cli $(ARGS)
+PYTHON?=python
 
 test:
-	$(PYTHON) -m pytest $(ARGS)
-
-demo:
-	$(PYTHON) -m regressionx.cli run --config examples/config.example.yaml
+	$(PYTHON) -m unittest discover tests
 
 clean:
-	rm -rf demo
+	$(PYTHON) -c "import pathlib; [p.unlink() for p in pathlib.Path('.').rglob('*.pyc')]"
+	$(PYTHON) -c "import pathlib; [p.rmdir() for p in pathlib.Path('.').rglob('__pycache__')]"
+
+demo:
+	$(PYTHON) bin/regressionX run --config examples/config.py
