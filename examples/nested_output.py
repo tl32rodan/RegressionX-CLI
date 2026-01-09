@@ -5,6 +5,8 @@ from regressionx import Template
 run_logic = Template(
     baseline_command="python -c \"import os; os.makedirs('sub/dir', exist_ok=True); open('sub/dir/file.txt', 'w').write('{base}')\"",
     candidate_command="python -c \"import os; os.makedirs('sub/dir', exist_ok=True); open('sub/dir/file.txt', 'w').write('{cand}')\"",
+    base_path="runs/{name}/baseline",
+    cand_path="runs/{name}/candidate"
 )
 
 cases = run_logic.generate([
