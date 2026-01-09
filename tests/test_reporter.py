@@ -38,7 +38,7 @@ class TestMarkdownReporter(unittest.TestCase):
         reporter = MarkdownReporter(self.report_path)
         
         # Add a passing case
-        case1 = Case(name="case_pass", baseline_command="echo a", candidate_command="echo b")
+        case1 = Case(name="case_pass", baseline_command="echo a", candidate_command="echo b", base_path="/tmp/a1", cand_path="/tmp/b1")
         reporter.add_result(
             case=case1,
             base_res=MockProcess(0),
@@ -47,7 +47,7 @@ class TestMarkdownReporter(unittest.TestCase):
         )
         
         # Add a failing case (Mismatch)
-        case2 = Case(name="case_fail", baseline_command="echo a", candidate_command="echo b")
+        case2 = Case(name="case_fail", baseline_command="echo a", candidate_command="echo b", base_path="/tmp/a2", cand_path="/tmp/b2")
         reporter.add_result(
             case=case2,
             base_res=MockProcess(0),

@@ -19,14 +19,28 @@ class TestCLI(unittest.TestCase):
         if cli is None:
             self.fail("Implementation Missing: regressionx.cli module not found")
 
+    def _make_case(self, name):
+        return Case(
+            name=name,
+            baseline_command=f"echo {name}a",
+            candidate_command=f"echo {name}b",
+            base_path=f"/tmp/{name}/baseline",
+            cand_path=f"/tmp/{name}/candidate"
+        )
+
+    def _set_compare_ok(self, mock_compare):
+        mock_compare.return_value.match = True
+        mock_compare.return_value.errors = []
+        mock_compare.return_value.diffs = []
+
     @patch('regressionx.cli.run_case')
     @patch('regressionx.cli.load_config')
     @patch('regressionx.cli.compare_directories')
     def test_run_command_loads_config_and_runs_cases(self, mock_compare, mock_load, mock_run):
         # Arrange
         mock_load.return_value = [
-            Case(name="c1", baseline_command="echo 1a", candidate_command="echo 1b"),
-            Case(name="c2", baseline_command="echo 2a", candidate_command="echo 2b")
+            self._make_case("c1"),
+            self._make_case("c2")
         ]
         mock_run.return_value = (
             type('obj', (object,), {'returncode': 0}),
@@ -34,9 +48,7 @@ class TestCLI(unittest.TestCase):
             Path("/tmp/a"), Path("/tmp/b")
         )
         # Mock successful comparison
-        mock_compare.return_value.match = True
-        mock_compare.return_value.errors = []
-        mock_compare.return_value.diffs = []
+        self._set_compare_ok(mock_compare)
 
         # Act
         original_argv = sys.argv
@@ -50,11 +62,64 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(mock_load.call_count, 1)
         self.assertEqual(mock_run.call_count, 2)
 
-        # Check that work_root was passed
+        # Check call args
         args, kwargs = mock_run.call_args
-        self.assertEqual(len(args), 2)
+        self.assertEqual(len(args), 1)
         self.assertEqual(args[0].name, "c2")
-        self.assertTrue(isinstance(args[1], str)) # work_root
+
+    @patch('regressionx.cli.run_case')
+    @patch('regressionx.cli.load_config')
+    @patch('regressionx.cli.compare_directories')
+    def test_compare_command_only_compares(self, mock_compare, mock_load, mock_run):
+        mock_load.return_value = [
+            self._make_case("c1")
+        ]
+        self._set_compare_ok(mock_compare)
+
+        cli.main(["compare", "--config", "dummy_config.py"])
+
+        self.assertEqual(mock_run.call_count, 0)
+        self.assertEqual(mock_compare.call_count, 1)
+
+    @patch('regressionx.cli.run_case')
+    @patch('regressionx.cli.load_config')
+    @patch('regressionx.cli.compare_directories')
+    def test_run_base_command_runs_baseline_only(self, mock_compare, mock_load, mock_run):
+        mock_load.return_value = [
+            self._make_case("c1")
+        ]
+        mock_run.return_value = (
+            type('obj', (object,), {'returncode': 0}),
+            type('obj', (object,), {'returncode': 0}),
+            Path("/tmp/a"), Path("/tmp/b")
+        )
+        self._set_compare_ok(mock_compare)
+
+        cli.main(["run_base", "--config", "dummy_config.py"])
+
+        args, kwargs = mock_run.call_args
+        self.assertEqual(kwargs["run_baseline"], True)
+        self.assertEqual(kwargs["run_candidate"], False)
+
+    @patch('regressionx.cli.run_case')
+    @patch('regressionx.cli.load_config')
+    @patch('regressionx.cli.compare_directories')
+    def test_run_cand_command_runs_candidate_only(self, mock_compare, mock_load, mock_run):
+        mock_load.return_value = [
+            self._make_case("c1")
+        ]
+        mock_run.return_value = (
+            type('obj', (object,), {'returncode': 0}),
+            type('obj', (object,), {'returncode': 0}),
+            Path("/tmp/a"), Path("/tmp/b")
+        )
+        self._set_compare_ok(mock_compare)
+
+        cli.main(["run_cand", "--config", "dummy_config.py"])
+
+        args, kwargs = mock_run.call_args
+        self.assertEqual(kwargs["run_baseline"], False)
+        self.assertEqual(kwargs["run_candidate"], True)
 
     @patch('sys.stderr', new_callable=MagicMock)
     def test_missing_config_arg_prints_usage(self, mock_stderr):

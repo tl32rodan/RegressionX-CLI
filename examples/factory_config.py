@@ -6,7 +6,9 @@ from regressionx import Template
 run_logic = Template(
     baseline_command="echo Running Baseline for {module}...",
     candidate_command="echo Running Candidate for {module}...",
-    env={"TEST_MODE": "{mode}"}
+    env={"TEST_MODE": "{mode}"},
+    base_path="runs/{name}/baseline",
+    cand_path="runs/{name}/candidate"
 )
 
 # Define the data

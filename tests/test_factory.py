@@ -20,7 +20,9 @@ class TestTemplateFactory(unittest.TestCase):
         tmpl = Template(
             baseline_command="old_tool --input {input} --mode {mode}",
             candidate_command="new_tool --input {input} --mode {mode}",
-            env={"LOG_LEVEL": "{log_level}"}
+            env={"LOG_LEVEL": "{log_level}"},
+            base_path="/tmp/{name}/baseline",
+            cand_path="/tmp/{name}/candidate"
         )
         
         data = [
@@ -51,7 +53,12 @@ class TestTemplateFactory(unittest.TestCase):
         if Template is None:
             self.fail("Implementation Missing")
 
-        tmpl = Template(baseline_command="echo {required}", candidate_command="echo {required}")
+        tmpl = Template(
+            baseline_command="echo {required}",
+            candidate_command="echo {required}",
+            base_path="/tmp/{name}/baseline",
+            cand_path="/tmp/{name}/candidate"
+        )
         
         # Act & Assert
         with self.assertRaises(KeyError):
