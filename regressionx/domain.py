@@ -22,9 +22,13 @@ class Case:
     
     # Baseline (The Control)
     baseline_command: str
-    
+
     # Candidate (The Experiment)
     candidate_command: str
+
+    # Execution Paths
+    base_path: str
+    cand_path: str
     
     env: Optional[Dict[str, str]] = None # Action Context
     

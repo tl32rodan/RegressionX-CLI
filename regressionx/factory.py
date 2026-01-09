@@ -5,10 +5,29 @@ class Template:
     """
     A factory class to generate multiple Cases from command templates and a list of data dictionaries.
     """
-    def __init__(self, baseline_command: str, candidate_command: str, env: Optional[Dict[str, str]] = None):
+    def __init__(
+        self,
+        baseline_command: str,
+        candidate_command: str,
+        env: Optional[Dict[str, str]] = None,
+        base_path: Optional[str] = None,
+        cand_path: Optional[str] = None
+    ):
         self.baseline_template = baseline_command
         self.candidate_template = candidate_command
         self.env_template = env or {}
+        self.base_path_template = base_path
+        self.cand_path_template = cand_path
+
+    def _resolve_path(self, template: Optional[str], data: Dict[str, Any], label: str) -> str:
+        if template is not None:
+            try:
+                return template.format(**data)
+            except KeyError as e:
+                raise KeyError(f"Missing key in data for {label} template: {e}")
+        if label in data:
+            return str(data[label])
+        raise KeyError(f"Data dictionary must include '{label}' or provide a template.")
 
     def generate(self, data_list: List[Dict[str, Any]]) -> List[Case]:
         """
@@ -38,6 +57,8 @@ class Template:
                 name=str(data["name"]),
                 baseline_command=base_cmd,
                 candidate_command=cand_cmd,
+                base_path=self._resolve_path(self.base_path_template, data, "base_path"),
+                cand_path=self._resolve_path(self.cand_path_template, data, "cand_path"),
                 env=env if env else None
             ))
             
