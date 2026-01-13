@@ -22,8 +22,8 @@ class TestConfigLoader(unittest.TestCase):
                 from regressionx.domain import Case
                 
                 cases = [
-                    Case(name="test_1", baseline_command="echo 1a", candidate_command="echo 1b"),
-                    Case(name="test_2", baseline_command="echo 2a", candidate_command="echo 2b"),
+                    Case(name="test_1", baseline_command="echo 1a", candidate_command="echo 1b", base_path="/tmp/a1", cand_path="/tmp/b1"),
+                    Case(name="test_2", baseline_command="echo 2a", candidate_command="echo 2b", base_path="/tmp/a2", cand_path="/tmp/b2"),
                 ]
             """))
             config_path = f.name
