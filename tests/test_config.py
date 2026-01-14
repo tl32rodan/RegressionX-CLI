@@ -7,7 +7,6 @@ import sys
 # Ensure the root directory is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from regressionx.domain import Case
 # This import is expected to fail initially or the function to be missing
 try:
     from regressionx.config import load_config

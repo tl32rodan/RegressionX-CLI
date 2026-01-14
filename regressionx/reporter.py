@@ -1,5 +1,3 @@
-import os
-from typing import List, Dict, Any
 from .domain import Case
 
 class MarkdownReporter:
@@ -28,13 +26,13 @@ class MarkdownReporter:
         failed = total - passed
         
         md = [
-            f"# RegressionX Report",
-            f"",
+            "# RegressionX Report",
+            "",
             f"**Total:** {total} | **Passed:** {passed} | **Failed:** {failed}",
-            f"",
-            f"## Summary",
-            f"| Case | Status |",
-            f"| :--- | :--- |"
+            "",
+            "## Summary",
+            "| Case | Status |",
+            "| :--- | :--- |"
         ]
         
         # Summary Table

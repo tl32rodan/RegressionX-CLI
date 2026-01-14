@@ -1,7 +1,6 @@
 import unittest
 import tempfile
 import shutil
-import os
 from pathlib import Path
 
 # We will implement this module next
