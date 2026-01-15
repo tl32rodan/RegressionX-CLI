@@ -60,7 +60,8 @@ class TestMarkdownReporter(unittest.TestCase):
         
         # Verify
         self.assertTrue(os.path.exists(self.report_path))
-        content = open(self.report_path, "r", encoding="utf-8").read()
+        with open(self.report_path, "r", encoding="utf-8") as report_file:
+            content = report_file.read()
         
         # Check for Markdown syntax
         self.assertIn("# RegressionX Report", content)

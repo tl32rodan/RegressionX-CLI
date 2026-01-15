@@ -1,5 +1,4 @@
 import unittest
-import subprocess
 import sys
 import os
 
@@ -56,7 +55,7 @@ class TestJobExecutor(unittest.TestCase):
 
         try:
             # Act
-            result = run_case(case)
+            run_case(case)
             
             # Assert
             # 1. Check directories exist

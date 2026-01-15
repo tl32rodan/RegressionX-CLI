@@ -47,7 +47,6 @@ def main(args=None):
         run_baseline, run_candidate, compare_only = COMMAND_MODES[parsed_args.command]
 
         for case in cases:
-            print(f"Running case: {case.name}...", end=" ", flush=True)
             try:
                 if compare_only:
                     base_res = skipped_result()
@@ -69,9 +68,7 @@ def main(args=None):
                     
                     reporter.add_result(case, base_res, cand_res, cmp_result)
                     
-                    if cmp_result.match:
-                        print("PASSED")
-                    else:
+                    if not cmp_result.match:
                         print("FAILED (Mismatch)")
                         for err in cmp_result.errors:
                             print(f"  [Structure] {err}")
