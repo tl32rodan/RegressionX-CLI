@@ -52,23 +52,32 @@ easyreg run                    ← computational feedback sensor
 ### Pattern 2: Code review agent integration
 
 The `scld-code-reviewer` agent (see [scld-code-reviewer repo](https://github.com/tl32rodan/scld-code-reviewer))
-uses easyreg MCP tools as part of its regression skill.
+uses easyreg MCP tools via its standalone `/regress` command. The regression
+personality is separate from `/review` — both can be required before `/checkin`
+allows filing, and both run identically from a developer terminal and from CI.
 
-Full design: `docs/research/regression-personality-proposal.md` in the
-`scld-code-reviewer` repo.
+Full design: [ADR-002](https://github.com/tl32rodan/scld-code-reviewer/blob/main/docs/architecture/ADR-002-regression-personality-option-a.md)
+in the `scld-code-reviewer` repo (all phases complete as of 2026-05-18).
 
-Minimal integration: the review agent calls `regressionx_run`, inspects the
-summary, and appends a REG section to its `review.md` artifact.
+The `/regress` command:
+1. Auto-discovers `regression/suite.json` at repo root
+2. Calls `regressionx_run` via MCP
+3. Maps results to a verdict using the table below
+4. Emits `regression.md` (same Executive Summary conventions as `review.md`)
 
-Verdict mapping used by the review agent:
+The `/checkin` command reads both `review.md` and `regression.md` before
+allowing a commit to file — neither alone closes the quality loop.
 
-| easyreg summary | Review REG status | Effect on review verdict |
+Verdict mapping:
+
+| easyreg summary | `/regress` verdict | `/checkin` impact |
 |---|---|---|
-| All PASS | PASS | No change |
-| Any NEW | BORDERLINE | Demote overall verdict by one level |
-| Any FAIL | VIOLATE | Force verdict to VIOLATED |
-| Any ERROR | N/A | Warn; do not penalize verdict |
-| No suite config | N/A | Silent skip |
+| All PASS | `PASS` | Allowed |
+| Any NEW (no FAIL) | `BORDERLINE` | Allowed with explicit human ack |
+| Any FAIL | `VIOLATED` | Blocked |
+| Any ERROR with no other signal | `N/A` (infra) | Allowed with warning |
+| Any ERROR with some PASS | `BORDERLINE` (partial) | Allowed with explicit human ack |
+| No suite configured | `N/A` (skip) | Allowed (regression.md not produced) |
 
 ### Pattern 3: CI/CD gate
 
@@ -164,7 +173,7 @@ The `MUST NOT` list above directly addresses this for easyreg.
 ```
 repo/
 ├── regression/
-│   ├── suite.json          ← suite config (auto-detected by scld-code-reviewer)
+│   ├── suite.json          ← suite config (auto-detected by scld-code-reviewer /regress)
 │   ├── golden/             ← golden references (committed to git)
 │   └── runs/               ← run outputs (add to .gitignore)
 ```
@@ -191,8 +200,8 @@ Suite config template with timestamp normalization:
 ```
 
 The `regression/` layout is the convention expected by the `scld-code-reviewer`
-regression skill (when implemented). Projects using a different path must configure
-it explicitly.
+`/regress` command (see [ADR-002](https://github.com/tl32rodan/scld-code-reviewer/blob/main/docs/architecture/ADR-002-regression-personality-option-a.md)).
+Projects using a different path must configure it explicitly.
 
 ---
 
@@ -200,4 +209,5 @@ it explicitly.
 
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
-- [scld-code-reviewer: regression-personality-proposal.md](https://github.com/tl32rodan/scld-code-reviewer/blob/main/docs/research/regression-personality-proposal.md) — integration design
+- [scld-code-reviewer: ADR-002](https://github.com/tl32rodan/scld-code-reviewer/blob/main/docs/architecture/ADR-002-regression-personality-option-a.md) — regression personality full design
+- [scld-code-reviewer: regression-personality-proposal.md](https://github.com/tl32rodan/scld-code-reviewer/blob/main/docs/research/regression-personality-proposal.md) — option analysis and history
