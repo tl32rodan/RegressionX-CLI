@@ -51,12 +51,12 @@ easyreg run                    ← computational feedback sensor
 
 ### Pattern 2: Code review agent integration
 
-The `scld-code-reviewer` agent (see [scld-code-reviewer repo](https://github.com/tl32rodan/scld-code-reviewer))
-uses easyreg MCP tools via its standalone `/regress` command. The regression
-personality is separate from `/review` — both can be required before `/checkin`
-allows filing, and both run identically from a developer terminal and from CI.
+The `scld-code-reviewer` agent uses easyreg MCP tools via its standalone
+`/regress` command. The regression personality is separate from `/review` —
+both can be required before `/checkin` allows filing, and both run identically
+from a developer terminal and from CI.
 
-Full design: [ADR-002](https://github.com/tl32rodan/scld-code-reviewer/blob/main/docs/architecture/ADR-002-regression-personality-option-a.md)
+Full design: `docs/architecture/ADR-002-regression-personality-option-a.md`
 in the `scld-code-reviewer` repo (all phases complete as of 2026-05-18).
 
 The `/regress` command:
@@ -200,8 +200,9 @@ Suite config template with timestamp normalization:
 ```
 
 The `regression/` layout is the convention expected by the `scld-code-reviewer`
-`/regress` command (see [ADR-002](https://github.com/tl32rodan/scld-code-reviewer/blob/main/docs/architecture/ADR-002-regression-personality-option-a.md)).
-Projects using a different path must configure it explicitly.
+`/regress` command (see `docs/architecture/ADR-002-regression-personality-option-a.md`
+in the `scld-code-reviewer` repo). Projects using a different path must configure
+it explicitly.
 
 ---
 
@@ -209,5 +210,5 @@ Projects using a different path must configure it explicitly.
 
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
-- [scld-code-reviewer: ADR-002](https://github.com/tl32rodan/scld-code-reviewer/blob/main/docs/architecture/ADR-002-regression-personality-option-a.md) — regression personality full design
-- [scld-code-reviewer: regression-personality-proposal.md](https://github.com/tl32rodan/scld-code-reviewer/blob/main/docs/research/regression-personality-proposal.md) — option analysis and history
+- `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
+- `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
