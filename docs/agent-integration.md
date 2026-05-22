@@ -28,6 +28,40 @@ LLM-based code review (an inferential feedback sensor). Neither alone is suffici
 
 ---
 
+## Background: Test-Oriented Programming (TOP, April 2026)
+
+Source: [arxiv:2604.08102 — Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102)
+
+TOP is an emerging paradigm that extends TDD to its logical conclusion in the AI age:
+
+| Dimension | TDD | **TOP** |
+|---|---|---|
+| Who writes tests | Developer | Developer |
+| Who writes production code | Developer (guided by tests) | **AI** (generated from tests) |
+| Primary developer output | Tests + code | **Tests only** |
+| Role of tests | Red/green/refactor cycle | **Specification + verification** |
+
+In TOP, tests are the *specification*. Production code is generated and regenerated
+by AI as needed. The developer's job is to write complete, correct tests — not to
+write implementation.
+
+**How easyreg golden files relate to TOP:**
+
+Golden files are an *output-level* analog of TOP test specs. They define what the
+system must produce at the command/system output boundary. Just as a developer's
+unit tests are the spec for production logic in TOP, golden files are the spec for
+observable system behavior.
+
+Consequence: modifying a golden file to make a regression disappear is the output-level
+equivalent of deleting a unit test in TOP. Both actions destroy the specification.
+This is why the hard constraint below — **NEVER call `regressionx_promote`** —
+exists and is non-negotiable.
+
+Kent Beck's warning (2026): *"Agents delete tests to make them 'pass'."* applies
+equally to golden files.
+
+---
+
 ## Integration Patterns
 
 ### Pattern 1: Post-change regression gate
@@ -102,6 +136,28 @@ print('Regression: all cases PASS')
 "
 ```
 
+### Pattern 4: TOP workflow integration
+
+In a Test-Oriented Programming workflow, easyreg golden files serve as the
+output-level specification alongside unit tests:
+
+```
+Developer writes unit tests (specification for internal logic)
+Developer writes / updates golden files (specification for system output)
+        ↓
+AI generates production code to satisfy unit tests
+        ↓
+easyreg run — confirm generated code also satisfies output goldens
+        ↓
+  PASS: both specs satisfied
+  FAIL: generated code broke observable behavior — AI must fix code, not goldens
+  NEW:  a new output boundary appeared — human reviews before promoting
+```
+
+In TOP mode, the invariant is especially strict: **no agent may promote a golden
+or modify a golden without explicit human review**, because goldens are specifications,
+not incidental artifacts.
+
 ---
 
 ## Guidelines for Coding Agents Using easyreg
@@ -110,8 +166,10 @@ print('Regression: all cases PASS')
 
 - **Never call `regressionx_promote` automatically.** Promoting a golden is an
   explicit human decision. Auto-promotion hides regressions rather than surfacing
-  them — the same anti-pattern Kent Beck warns about with agents deleting tests.
-- **Never delete or modify files in `golden_dir`.** These are the ground truth.
+  them — this is the output-level equivalent of deleting a unit test in TOP mode
+  (Kent Beck, 2026; TOP paper arxiv:2604.08102).
+- **Never delete or modify files in `golden_dir`.** These are the ground truth
+  specification.
 - **Never modify `diff_rules` to suppress a FAIL.** This defeats the sensor.
 - **Never modify `ignore_rules` to make a FAIL into PASS.** Same issue.
 
@@ -149,16 +207,16 @@ ground truth. The golden is only valid if a human confirmed it.
 
 ---
 
-## Relationship to TDD
+## Relationship to TDD and TOP
 
 Kent Beck (2026): "TDD is a superpower when working with AI agents."
 
-Unit tests (TDD) and easyreg regression tests are not substitutes:
+Unit tests (TDD/TOP) and easyreg regression tests are not substitutes:
 
-| Level | Tool | What it verifies |
-|---|---|---|
-| Function / unit | TDD unit tests | Internal logic correctness |
-| System / output | easyreg goldens | Observable behavior preservation |
+| Level | Tool | What it verifies | In TOP mode |
+|---|---|---|---|
+| Function / unit | TDD unit tests | Internal logic correctness | Developer-written specification |
+| System / output | easyreg goldens | Observable behavior preservation | Output-level specification |
 
 A complete harness has both. The specific failure mode Beck warns about — agents
 deleting unit tests to make them "pass" — applies equally to golden references:
@@ -210,5 +268,16 @@ it explicitly.
 
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
+- [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
 - `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
+- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
+
+---
+
+## Session Log
+
+| Date | Topics | Changes made |
+|---|---|---|
+| 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
+| 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
