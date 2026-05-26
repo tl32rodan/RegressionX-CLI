@@ -62,6 +62,40 @@ equally to golden files.
 
 ---
 
+## Background: TDAD and easyreg Complementarity (March 2026)
+
+Source: [arxiv:2603.17973 — TDAD: Test-Driven Agentic Development](https://arxiv.org/abs/2603.17973)
+
+TDAD performs **pre-commit, code-level** impact analysis using an AST-based
+code-test dependency graph. Before committing, the agent identifies which unit
+tests are most affected by the proposed change and verifies only those first.
+Result: −70% test-level regressions on SWE-bench Verified.
+
+TDAD and easyreg are at different levels and **complement each other**:
+
+| Dimension | TDAD | easyreg |
+|---|---|---|
+| Level | Code-level (unit/integration) | System output-level |
+| Mechanism | AST graph → identify impacted tests | Golden-file comparison |
+| When it runs | Pre-commit, inside the agent loop | Post-change, CI gate |
+| What it prevents | Unit test regressions from patches | Observable behavior regressions |
+| Human involvement | Automated (agent self-corrects) | Human approves golden promotion |
+| Model | Code-aware (AST analysis) | Code-agnostic (output comparison) |
+
+A complete harness has both:
+1. TDAD-style pre-commit targeted test selection (prevents broken unit tests
+   before code even lands)
+2. easyreg golden-file comparison (confirms observable system behavior at the
+   output boundary, after the change lands)
+
+**Future direction:** TDAD's approach suggests a Phase 3 enhancement for easyreg —
+a `--affected-by <files>` flag using a lightweight trigger-mapping in `suite.json`.
+This would let agents run targeted easyreg cases first (fast inner loop) before
+the full suite. See `docs/roadmap.md` for the Phase 3 design sketch and the
+prerequisite conditions that must be met before implementing it.
+
+---
+
 ## Integration Patterns
 
 ### Pattern 1: Post-change regression gate
@@ -224,6 +258,12 @@ an agent that modifies goldens to hide regressions is the same anti-pattern.
 
 The `MUST NOT` list above directly addresses this for easyreg.
 
+**Beck's "Genie Tarpit" (May 2026)** adds a further dimension: AI-generated code
+erodes design optionality by default, even when it appears to pass tests. easyreg
+catches behavioral regressions (did the observable output change?). It does not
+catch optionality erosion (did the design get worse?). That gap is filled by the
+inferential feedback sensor: `scld-code-reviewer`'s MEC protocol category.
+
 ---
 
 ## Recommended Repo Layout for Projects Using Both Tools
@@ -267,8 +307,10 @@ it explicitly.
 ## Further Reading
 
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
+- [easyreg docs/roadmap.md](roadmap.md) — Phase 2 & Phase 3 integration plans
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
 - [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
+- [TDAD: Test-Driven Agentic Development](https://arxiv.org/abs/2603.17973) — arxiv:2603.17973 (March 2026)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
 - `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
 - `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
@@ -281,3 +323,4 @@ it explicitly.
 |---|---|---|
 | 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
 | 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
+| 2026-05-26 | TDAD paper (arxiv:2603.17973); Genie Tarpit (Beck, May 2026) | TDAD complementarity section added; Genie Tarpit note in TDD/TOP section; roadmap.md created with Phase 2 & 3 plans |
