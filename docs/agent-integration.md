@@ -158,6 +158,58 @@ In TOP mode, the invariant is especially strict: **no agent may promote a golden
 or modify a golden without explicit human review**, because goldens are specifications,
 not incidental artifacts.
 
+### Pattern 5: SPDD-aligned specification ownership
+
+Structured-Prompt-Driven Development (SPDD) treats prompts and specs as
+first-class team artifacts — version-controlled, peer-reviewed, reused.
+Applied to easyreg:
+
+- `regression/suite.json` is an SPDD-grade artifact. It should be
+  version-controlled, PR-reviewed when changed, and structured enough for
+  any team member to understand *why* each case exists and what it proves.
+- `regression/golden/` files are the expected-output specification. Like
+  SPDD structured prompts, they encode design intent that should survive
+  engineer turnover and AI-session churn.
+- Changing `suite.json` requires the same review rigor as changing source
+  code — because it *is* the specification of observable system behavior.
+
+**Consequence**: a PR that adds or removes regression cases without updating
+`suite.json` has an incomplete specification. A PR that modifies golden files
+without a human-reviewed rationale has an incomplete specification change.
+
+Source: [Structured-Prompt-Driven Development (SPDD)](https://martinfowler.com/articles/structured-prompt-driven/)
+— Fowler / Wei Zhang / Jessie Jie Xia (Apr 28, 2026)
+
+---
+
+## Feedback Flywheel Integration (Garg/Fowler, 2026)
+
+Source: [Feedback Flywheel — Patterns for Reducing Friction in AI-Assisted Development](https://martinfowler.com/articles/reduce-friction-ai/feedback-flywheel.html) (Apr 9, 2026)
+
+The Feedback Flywheel converts individual AI interactions into collective team
+improvement. easyreg FAIL cases are high-value flywheel inputs:
+
+| Signal type | easyreg event | Harness artifact to improve |
+|---|---|---|
+| **Context gap** | FAIL on timestamp-dependent output | Add `ignore_regex` rule to `suite.json` |
+| **Platform variance** | FAIL on platform-specific lines | Add `ignore_line` rule targeting those lines |
+| **Promotion confusion** | Repeated NEW verdicts needing manual promotion | Update agent-integration docs with clearer promotion protocol |
+| **CI environment gap** | ERROR due to missing dependency | Add environment setup to CI configuration |
+| **Numeric precision** | FAIL on floating-point values that legitimately vary | Add `tolerance` diff rule to `suite.json` |
+
+Each FAIL case that gets investigated and resolved should leave the harness
+better prepared for the next run. Teams that treat FAIL cases as one-off fixes
+plateau; teams that update `suite.json`'s `diff_rules` and CI configuration
+after each investigation accumulate harness quality.
+
+**Practical implementation — after resolving a FAIL:**
+1. If root cause was a `diff_rule` gap → update `suite.json` in the same PR
+2. If root cause was a genuine regression → document the regression in the PR description
+3. If root cause was a CI environment issue → update `.github/workflows/` in the same PR
+
+The `suite.json` improvement should happen in the same PR that fixes the root
+cause — not as a follow-up that gets lost.
+
 ---
 
 ## Guidelines for Coding Agents Using easyreg
@@ -269,6 +321,8 @@ it explicitly.
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
 - [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
+- [Structured-Prompt-Driven Development (SPDD)](https://martinfowler.com/articles/structured-prompt-driven/) — Fowler / Wei Zhang / Jessie Jie Xia (April 2026)
+- [Feedback Flywheel](https://martinfowler.com/articles/reduce-friction-ai/feedback-flywheel.html) — Garg / Fowler (April 2026)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
 - `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
 - `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
@@ -281,3 +335,4 @@ it explicitly.
 |---|---|---|
 | 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
 | 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
+| 2026-06-02 | SPDD (Fowler, Apr 2026) and Feedback Flywheel (Garg/Fowler, Apr 2026) | Pattern 5 (SPDD-aligned spec ownership); Feedback Flywheel section with signal table and flywheel improvement protocol; Further Reading updated |
