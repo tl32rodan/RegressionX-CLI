@@ -28,6 +28,41 @@ LLM-based code review (an inferential feedback sensor). Neither alone is suffici
 
 ---
 
+## Background: Trust Accumulation (Beck, 2026)
+
+Source: [Trust Factory — tidyfirst.substack.com/p/trust-factory](https://tidyfirst.substack.com/p/trust-factory)
+*(paywalled; summary from search snippets)*
+
+Kent Beck's June 2026 thesis: **"We're accumulating code faster than we are
+accumulating trust."** In the AI age, agents generate code at a pace that far
+outpaces traditional trust-building cycles. The harness is the mechanism that
+keeps trust in pace with velocity.
+
+Beck maps XP's *Redundancy* principle directly to this problem: addressing hard
+problems several ways reduces the probability of a trust-eroding surprise.
+Running both an **inferential** sensor (code review) and a **computational**
+sensor (easyreg golden-file regression) applies this principle at the harness level:
+two independent checks make it less likely that a regression slips into production
+undetected.
+
+**What this means for easyreg:**
+- Each PASS cycle is one unit of accumulated trust that the agent preserves
+  observable behavior. PASS streaks are evidence for granting more autonomy
+  (Fowler's "humans on the loop" posture).
+- A FAIL cycle is trust-negative, and the response matters: an agent that fixes
+  the *code* (not the golden) preserves the trust-accumulation property. An agent
+  that modifies goldens to make a FAIL disappear destroys it — corrupting the very
+  mechanism that was building trust.
+- Consistent golden promotion by humans (not agents) keeps the golden set a
+  reliable ground truth, which is what makes PASS verdicts meaningful as trust signals.
+
+**Professional validation**: at The Pragmatic Summit (2026), Fowler and Beck
+jointly stated that AI's impact is "a whole size different from anything we've
+faced before". Their shared response — structure and discipline around agents,
+not just faster adoption — validates the harness investment.
+
+---
+
 ## Background: Test-Oriented Programming (TOP, April 2026)
 
 Source: [arxiv:2604.08102 — Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102)
@@ -167,7 +202,9 @@ not incidental artifacts.
 - **Never call `regressionx_promote` automatically.** Promoting a golden is an
   explicit human decision. Auto-promotion hides regressions rather than surfacing
   them — this is the output-level equivalent of deleting a unit test in TOP mode
-  (Kent Beck, 2026; TOP paper arxiv:2604.08102).
+  (Kent Beck, 2026; TOP paper arxiv:2604.08102). It also destroys the
+  trust-accumulation property: PASS verdicts only mean something if the golden is
+  trustworthy (Beck, "Trust Factory", 2026).
 - **Never delete or modify files in `golden_dir`.** These are the ground truth
   specification.
 - **Never modify `diff_rules` to suppress a FAIL.** This defeats the sensor.
@@ -203,7 +240,8 @@ Agent re-runs: regressionx_run → verdict should now be PASS
 ```
 
 An agent that skips human review and auto-promotes is producing a corrupted
-ground truth. The golden is only valid if a human confirmed it.
+ground truth. The golden is only valid if a human confirmed it — and a golden
+that hasn't been confirmed provides no trust-accumulation value.
 
 ---
 
@@ -213,10 +251,10 @@ Kent Beck (2026): "TDD is a superpower when working with AI agents."
 
 Unit tests (TDD/TOP) and easyreg regression tests are not substitutes:
 
-| Level | Tool | What it verifies | In TOP mode |
-|---|---|---|---|
-| Function / unit | TDD unit tests | Internal logic correctness | Developer-written specification |
-| System / output | easyreg goldens | Observable behavior preservation | Output-level specification |
+| Level | Tool | What it verifies | In TOP mode | Trust signal |
+|---|---|---|---|---|
+| Function / unit | TDD unit tests | Internal logic correctness | Developer-written specification | High: developer owns it |
+| System / output | easyreg goldens | Observable behavior preservation | Output-level specification | High: human-promoted only |
 
 A complete harness has both. The specific failure mode Beck warns about — agents
 deleting unit tests to make them "pass" — applies equally to golden references:
@@ -271,7 +309,8 @@ it explicitly.
 - [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
 - `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
-- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
+- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — expert insights index (through May 2026)
+- `scld-code-reviewer: docs/research/2026-06-expert-insights.md` — expert insights index (June 2026+)
 
 ---
 
@@ -281,3 +320,4 @@ it explicitly.
 |---|---|---|
 | 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
 | 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
+| 2026-06-04 | Beck "Trust Factory" (June 2026): trust accumulation as harness metric; joint Beck+Fowler "Cycles of Disruption" interview | Added Trust Accumulation background section; strengthened MUST NOT rationale with trust-accumulation framing; updated TDD/TOP table with trust signal column |
