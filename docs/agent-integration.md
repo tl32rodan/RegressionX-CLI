@@ -264,14 +264,43 @@ it explicitly.
 
 ---
 
+## Background: TDAD v2 Validation (May 2026)
+
+Source: [arxiv.org/abs/2603.17973v2](https://arxiv.org/abs/2603.17973v2) — TDAD paper v2, submitted to ACM AIWare 2026.
+
+TDAD's central finding is directly relevant to how agents should use easyreg:
+
+> "Agents do not need to be told *how* to do TDD; they need to be told
+> *which* tests to check."
+
+Procedural instructions ("run all tests before committing") actually *increased*
+regressions by 9.94% in smaller models — they consumed context budget on
+procedure rather than verification. Targeted test context (specifying which
+tests apply) reduced regressions by 70%.
+
+**easyreg's `regressionx_show_config` → exact case names → `regressionx_run`
+workflow is the TDAD targeted-context pattern.** The SKILL.md instruction to
+always call `regressionx_show_config` first (to obtain the precise case names)
+is validated by TDAD's findings.
+
+Preferred agent instruction form:
+- ✅ "Check the cases named in the config using `regressionx_show_config`, then
+  run them with `regressionx_run`"
+- ❌ "Run all regression tests" (procedural; no targeted context)
+
+---
+
 ## Further Reading
 
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
 - [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
+- [TDAD v2: Test-Driven Agentic Development](https://arxiv.org/abs/2603.17973v2) — arxiv:2603.17973v2 (May 2026)
+- [The VibeSec Reckoning](https://martinfowler.com/articles/vibesec-reckoning.html) — Fowler (May 2026)
+- [Agentic AI and Security](https://martinfowler.com/articles/agentic-ai-security.html) — Fowler / Korny Ottersten (2026)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
 - `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
-- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
+- `scld-code-reviewer: docs/research/2026-06-expert-insights.md` — latest expert insights index
 
 ---
 
@@ -281,3 +310,4 @@ it explicitly.
 |---|---|---|
 | 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
 | 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
+| 2026-06-09 | TDAD v2 validation; VibeSec + Agentic Security links | TDAD v2 background section; updated Further Reading; preferred vs discouraged agent instruction forms |
