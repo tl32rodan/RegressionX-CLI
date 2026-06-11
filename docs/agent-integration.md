@@ -28,6 +28,99 @@ LLM-based code review (an inferential feedback sensor). Neither alone is suffici
 
 ---
 
+## Sensor Types and Run Frequency (Böckeler, May 2026)
+
+Birgitta Böckeler's article
+["Maintainability Sensors for Coding Agents"](https://martinfowler.com/articles/sensors-for-coding-agents.html)
+(Thoughtworks / martinfowler.com, May 27, 2026) operationalizes the sensor model
+by specifying which sensor types run at which cadence:
+
+| Sensor type | Reliability | Cost | Recommended frequency |
+|---|---|---|---|
+| **Computational/deterministic** (easyreg, linters, coverage) | High | Low | Every commit — pre-commit hook or CI push gate |
+| **LLM/inferential** (code review agent, semantic analysis) | Probabilistic | High | Per PR / before checkin |
+
+Key principle: **LLM sensors are not a replacement for computational sensors.**
+They are additive, for the class of problems requiring semantic judgment. Run
+computational sensors first, at high frequency; use LLM sensors selectively,
+at the right abstraction layer.
+
+**Implication for project harnesses using both easyreg and a review agent:**
+
+```
+[every commit]   → easyreg run (computational, fast, cheap)
+[before checkin] → /review (LLM, semantic) + /regress (LLM interpreting easyreg)
+```
+
+Merging these into a single command would either slow easyreg to PR cadence
+(bad) or run LLM review on every commit (expensive). Keep them separate.
+
+---
+
+## Background: Agentic Programming and the Review Discipline
+
+Martin Fowler's bliki entries (May 21, 2026):
+- [Agentic Programming](https://martinfowler.com/bliki/AgenticProgramming.html)
+- [Vibe Coding](https://martinfowler.com/bliki/VibeCoding.html)
+
+Fowler defines two poles of AI-assisted development:
+
+| Mode | Human role | Code review | Result |
+|---|---|---|---|
+| **Agentic programming** | Reviews, tests, and understands all generated code | Required, detailed | Production-quality software |
+| **Vibe coding** | Never looks at the generated code | None | Suitable only for disposable software |
+
+easyreg is infrastructure for **agentic programming** workflows. Vibe-coded projects
+don't need regression suites; they don't have stable behavior worth tracking. A project
+that uses easyreg has made an implicit commitment to the agentic posture.
+
+---
+
+## Background: VibeSec — Why Computational Controls Are Non-Negotiable
+
+Source: [The VibeSec Reckoning](https://martinfowler.com/articles/vibesec-reckoning.html)
+— Thoughtworks, 2026
+
+> *"Prompting for test-driven development is not the same as enforcing code coverage
+> thresholds in your build tool."*
+
+This generalizes to: **inferential controls (prompts, review agents) cannot substitute
+for computational controls (deterministic enforcement)**.
+
+| Control | Type | Reliability |
+|---|---|---|
+| "Don't break existing behavior" in CLAUDE.md | Inferential | Can be overridden, misunderstood, forgotten |
+| easyreg golden regression in CI | Computational | Deterministic; cannot be bypassed without deliberate action |
+
+Fowler's team found serious failures in vibe-coded systems that prompts couldn't
+prevent — because prompts can be overridden in the next conversational turn.
+
+**easyreg is the computational enforcement layer that prompts cannot replace.**
+Running easyreg in CI means a regression cannot ship without deliberate human
+action (promotion), regardless of what any prompt says.
+
+---
+
+## Background: Evaluation as Architecture (Grannis, December 2025)
+
+Source: [Will Grannis, Google Cloud CTO — "AI Grew Up and Got a Job"](https://cloud.google.com/transform/ai-grew-up-and-got-a-job-lessons-from-2025-on-agents-and-trust)
+
+> *"Every GenAI project rapidly becomes an evaluation project."*
+
+Evaluation is no longer a phase at the end of a pipeline. Real-time **autoraters**
+(LLM-as-judge sensors) embedded in production pipelines act as self-correction loops.
+The practical expression:
+
+> *"Treat atomicity as an infrastructure requirement, not a prompting challenge."
+> Use agent undo stacks, transaction coordinators, idempotent tools, and checkpointing.*
+
+**easyreg as atomicity primitive**: `easyreg run` followed by a revert-on-FAIL
+gate (pre-commit hook or CI block) is an atomicity primitive — a code change that
+breaks observable behavior cannot advance through the pipeline, regardless of what
+the coding agent or prompt says. This is infrastructure, not prompting.
+
+---
+
 ## Background: Test-Oriented Programming (TOP, April 2026)
 
 Source: [arxiv:2604.08102 — Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102)
@@ -62,6 +155,36 @@ equally to golden files.
 
 ---
 
+## Generative Debt: Golden Files as LLM Context Defense (Fowler, June 2026)
+
+Source: [Fragments: June 2](https://martinfowler.com/fragments/2026-06-02.html)
+
+Fowler introduces **Generative Debt** — a new type of technical debt specific to
+AI-era codebases:
+
+> *"Generative Debt accumulates when a codebase contains confused concepts that
+> models are likely to reproduce. LLMs multiply what's currently happening —
+> both good code and bad code."*
+
+A confused abstraction or incorrect behavior in the codebase is not just a maintenance
+problem — it is context material that causes LLMs to generate *more* code in the
+same confused or incorrect style. Bad patterns compound at machine speed.
+
+**easyreg golden files serve as a generative debt defense at the output level:**
+
+- Golden files capture human-verified *correct* output behavior.
+- When a coding agent generates new code and easyreg runs, it confirms that the
+  new additions did not propagate confused or incorrect behavior into system outputs.
+- This is a stronger justification for tight golden hygiene than output correctness
+  alone: it is also about keeping the system's observable behavior free of patterns
+  that would mislead future LLM coding sessions.
+
+**Golden hygiene principle**: Stale or incorrect goldens are not just wrong — they
+are active misinformation for any agent that reads the codebase as context. Regularly
+reviewing and updating goldens is LLM context hygiene, not just regression maintenance.
+
+---
+
 ## Integration Patterns
 
 ### Pattern 1: Post-change regression gate
@@ -72,9 +195,9 @@ to confirm existing observable behavior is preserved.
 ```
 coding agent makes changes
         ↓
-easyreg run                    ← computational feedback sensor
+easyreg run                    ← computational feedback sensor (every commit)
         ↓
-  All PASS? ─yes─> proceed to code review (inferential feedback sensor)
+  All PASS? ─yes─> proceed to code review (inferential feedback sensor, before checkin)
         │
        no
         ↓
@@ -135,6 +258,9 @@ if fails:
 print('Regression: all cases PASS')
 "
 ```
+
+Following Böckeler's sensor frequency model: this CI step runs on **every push**,
+not just on PRs. The cheap computational sensor provides fast feedback at CI speed.
 
 ### Pattern 4: TOP workflow integration
 
@@ -268,10 +394,15 @@ it explicitly.
 
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
+- [Maintainability Sensors for Coding Agents](https://martinfowler.com/articles/sensors-for-coding-agents.html) — Böckeler / Fowler site (May 2026)
+- [The VibeSec Reckoning](https://martinfowler.com/articles/vibesec-reckoning.html) — Fowler (2026)
 - [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
+- [Will Grannis: AI Grew Up and Got a Job](https://cloud.google.com/transform/ai-grew-up-and-got-a-job-lessons-from-2025-on-agents-and-trust) — Google Cloud (Dec 2025)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
-- `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
+- `scld-code-reviewer: docs/architecture/regression-review-integration-plan.md` — integration plan with sensor frequency rationale
 - `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
+- `scld-code-reviewer: docs/research/2026-06-deep-research.md` — Böckeler, SPDD, PR-Agent, Beck TCR
+- `scld-code-reviewer: docs/research/2026-06-practitioner-sources.md` — Grannis, DORA 2025, stats
 
 ---
 
@@ -281,3 +412,4 @@ it explicitly.
 |---|---|---|
 | 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
 | 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
+| 2026-06-11 | Böckeler sensor frequency model; generative debt; agentic programming terminology; VibeSec; Grannis evaluation-as-arch | New background sections (sensor types, agentic programming, VibeSec, generative debt, evaluation-as-arch); CI pattern updated with frequency note; further reading updated |
