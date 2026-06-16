@@ -62,6 +62,58 @@ equally to golden files.
 
 ---
 
+## Background: TDAD — Test-Driven Agentic Development (March 2026)
+
+Source: [arxiv:2603.17973v2 — TDAD: Test-Driven Agentic Development](https://arxiv.org/abs/2603.17973v2)
+
+TDAD addresses a concrete problem: AI coding agents frequently introduce *regressions*
+— breaking previously-passing tests — even when they appear to resolve the target issue.
+Existing benchmarks (SWE-bench) measure resolution rate but ignore regression rate.
+
+**Key finding:**
+> Telling agents *which tests are most at risk from a change* reduces regressions ~70%.
+> Telling agents *how to do TDD* step-by-step produces no measurable improvement.
+
+TDAD's technical approach:
+1. Build an AST-based code-test dependency graph before any change
+2. Before committing a patch, identify which tests are most likely affected
+3. Feed the affected-test list back to the agent for self-correction
+
+**What this means for easyreg:**
+
+easyreg operates at the *output boundary* rather than the code-test level, but the
+core insight applies at both levels:
+
+| TDAD (code-test level) | easyreg (output level) |
+|---|---|
+| Code-test dependency graph | Golden files as output specifications |
+| "Which tests to check" | "Which golden files to compare" |
+| Agent self-corrects before committing | Agent fixes code; human promotes golden |
+| Regression rate: 6.08% → 1.82% | FAIL verdicts surface output regressions |
+
+The two are **complementary layers** of the same safety net:
+- TDAD catches logic regressions (unit test level) before code is filed
+- easyreg catches behavioral regressions (system output level) after code runs
+
+A project using both TDAD (or equivalent unit test impact analysis) and easyreg
+operates a complete two-layer computational harness.
+
+**Regression rate as a first-class metric:**
+TDAD's research establishes that *regression rate* is a distinct and important
+metric alongside *resolution rate*. easyreg surfaces this metric at the system
+output level. This is the theoretical validation for why `/regress` exists as an
+independent command in `scld-code-reviewer` (rather than being folded into
+`/review`).
+
+**Future direction — test impact hints (Proposal 4, June 2026):**
+A lightweight analogue of TDAD's graph could be added to easyreg: when a FAIL
+occurs, correlate the changed source files (from `git diff`) with case names
+(by substring match) to produce an impact-hint section in the report. This is
+a heuristic, not a full AST graph, but narrows the investigation space for large
+suites. Deferred until a large SCLD suite is in production.
+
+---
+
 ## Integration Patterns
 
 ### Pattern 1: Post-change regression gate
@@ -158,6 +210,28 @@ In TOP mode, the invariant is especially strict: **no agent may promote a golden
 or modify a golden without explicit human review**, because goldens are specifications,
 not incidental artifacts.
 
+### Pattern 5: TDAD + easyreg two-layer harness
+
+For projects that use TDAD-style test impact analysis alongside easyreg:
+
+```
+coding agent proposes change
+        ↓
+TDAD impact analysis          ← code-test dependency graph
+"Check these unit tests first"  ← targets the most-at-risk tests
+        ↓
+Agent self-corrects if unit tests fail
+        ↓
+easyreg run                   ← output-level specification check
+        ↓
+  All PASS: both layers satisfied → proceed to inferential review
+  FAIL: agent fixes code (never modifies goldens)
+```
+
+This pattern is currently aspirational for easyreg users — TDAD tooling
+(`pip install tdad`) is available separately. The two tools do not need to
+be installed together; they operate at different levels of the harness.
+
 ---
 
 ## Guidelines for Coding Agents Using easyreg
@@ -217,6 +291,7 @@ Unit tests (TDD/TOP) and easyreg regression tests are not substitutes:
 |---|---|---|---|
 | Function / unit | TDD unit tests | Internal logic correctness | Developer-written specification |
 | System / output | easyreg goldens | Observable behavior preservation | Output-level specification |
+| Regression rate | TDAD + easyreg | Rate of new breakage introduced by agent | First-class quality metric (TDAD, 2026) |
 
 A complete harness has both. The specific failure mode Beck warns about — agents
 deleting unit tests to make them "pass" — applies equally to golden references:
@@ -269,9 +344,12 @@ it explicitly.
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
 - [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
+- [TDAD: Test-Driven Agentic Development](https://arxiv.org/abs/2603.17973v2) — arxiv:2603.17973 (March 2026)
+- [Patterns for Reducing Friction in AI-Assisted Development](https://www.martinfowler.com/articles/reduce-friction-ai) — Garg on Fowler's site (April 2026)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
 - `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
-- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
+- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index (May 2026)
+- `scld-code-reviewer: docs/research/2026-06-expert-insights.md` — expert insights index (June 2026)
 
 ---
 
@@ -281,3 +359,4 @@ it explicitly.
 |---|---|---|
 | 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
 | 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
+| 2026-06-16 | TDAD paper (arxiv:2603.17973) added | TDAD background section, Pattern 5 (TDAD+easyreg two-layer harness), updated TDD/TOP/TDAD comparison table, regression rate as first-class metric, Proposal 4 (impact hint, deferred) |
