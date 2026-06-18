@@ -26,6 +26,16 @@ A harness has two control types:
 deterministically compares outputs against golden references. It pairs with
 LLM-based code review (an inferential feedback sensor). Neither alone is sufficient.
 
+**June 2026 constitutive definition** — an agent harness has four necessary and
+sufficient elements. easyreg's role in a full harness:
+
+| Harness element | easyreg's contribution |
+|---|---|
+| Agent loop | Regression run → verdict → fix loop (via `/regress` in scld-code-reviewer) |
+| Tool interface | MCP server: `regressionx_run`, `regressionx_compare`, `regressionx_promote`, etc. |
+| Context management | `regressionx_show_config` provides suite structure before running |
+| Control mechanisms | Human-only golden promotion; NEVER auto-promote golden files |
+
 ---
 
 ## Background: Test-Oriented Programming (TOP, April 2026)
@@ -59,6 +69,28 @@ exists and is non-negotiable.
 
 Kent Beck's warning (2026): *"Agents delete tests to make them 'pass'."* applies
 equally to golden files.
+
+---
+
+## Background: TDAD — Test-Driven Agentic Development (March 2026)
+
+Source: [arxiv:2603.17973](https://arxiv.org/abs/2603.17973) — ACM AIWare 2026
+Accessible secondary summary: [thelgtm.dev](https://thelgtm.dev/tdad-test-driven-agentic-development-reducing-code-regressions-by-70/)
+
+TDAD proves two things relevant to easyreg:
+
+1. **Procedural TDD instructions don't reduce regressions.** Telling an agent
+   step-by-step how to do TDD in text produces no measurable improvement in
+   regression rates (baseline: 6.08% → still ~6%).
+
+2. **Structured graph context does.** An AST-based code-test dependency graph,
+   surfaced to the agent before it commits a change, reduces regressions by 70%
+   (6.08% → 1.82%) and improves resolution rate from 24% to 32%.
+
+The TDAD insight for easyreg: if the agent knows *which test cases are sensitive
+to a given diff* before running the full suite, it can self-correct at the right
+moment rather than discovering failures after the fact. This motivates the
+`regressionx_impact` proposal in Pattern 5 below.
 
 ---
 
@@ -158,6 +190,57 @@ In TOP mode, the invariant is especially strict: **no agent may promote a golden
 or modify a golden without explicit human review**, because goldens are specifications,
 not incidental artifacts.
 
+### Pattern 5: TDAD-Inspired Diff-Aware Triage (Proposed)
+
+Motivated by the TDAD paper (arxiv:2603.17973, March 2026): surfacing affected
+tests *before* a full run reduces regressions by 70% because the agent can
+self-correct at the moment it has the diff in context.
+
+**Requires a new MCP tool `regressionx_impact` (not yet implemented):**
+
+```
+coding agent has a diff (changed files from git diff --name-only)
+        ↓
+Step 1: regressionx_impact(config_path, changed_files)
+        → affected_cases: ["case_a", "case_c"]
+        → all_cases: ["case_a", "case_b", "case_c"]
+        Agent sees: "2 of 3 cases may be affected by this diff"
+        ↓
+Step 2: regressionx_run(config_path, case_name=affected_cases[0]) — run triage
+        If any FAIL → agent self-corrects immediately (has diff + failure in context)
+        If all PASS → proceed to full suite
+        ↓
+Step 3: regressionx_run(config_path) — full suite (safety net)
+        Reports final verdict in regression.md
+```
+
+**Proposed `regressionx_impact` tool signature:**
+
+```python
+@mcp.tool()
+def regressionx_impact(config_path: str, changed_files: list[str]) -> dict:
+    """Given changed files (e.g. from git diff --name-only), return which
+    test cases are likely affected by those changes.
+
+    Approximation: a case is flagged if its command string references
+    any changed file, or if its golden_dir path shares a directory
+    subtree with any changed file.
+
+    Note: impact analysis is best-effort. The full suite remains
+    authoritative — indirect dependencies (shared utilities, config)
+    may not be captured by path-matching alone.
+
+    Returns:
+      affected_cases: list of case names likely sensitive to this diff
+      all_cases: full list of case names in the suite
+    """
+```
+
+**Implementation note**: This requires changes to both easyreg (`mcp_server.py`)
+and the `/regress` skill body in `scld-code-reviewer`. Both must be updated
+together — they share a behavioral contract. See `scld-code-reviewer:
+docs/research/2026-06-expert-insights.md` Proposal 4 for the full plan.
+
 ---
 
 ## Guidelines for Coding Agents Using easyreg
@@ -183,6 +266,8 @@ not incidental artifacts.
 - On NEW: report to the human that golden promotion is needed with a clear summary
   of what the new output contains.
 - On ERROR: report the environment issue; do not treat it as a test failure.
+- (When available) Call `regressionx_impact` with changed files before a full run
+  to focus investigation on the most likely failure points.
 
 ### The golden promotion protocol
 
@@ -221,6 +306,12 @@ Unit tests (TDD/TOP) and easyreg regression tests are not substitutes:
 A complete harness has both. The specific failure mode Beck warns about — agents
 deleting unit tests to make them "pass" — applies equally to golden references:
 an agent that modifies goldens to hide regressions is the same anti-pattern.
+
+The TDAD finding (2026) adds a third layer: even with TDD/goldens in place,
+agents that are *only told about TDD in text* still introduce regressions at the
+baseline rate. Structured context (impact graphs, explicit affected-case surfacing)
+is what actually reduces regressions. Pattern 5 (regressionx_impact) is easyreg's
+contribution to this structured-context layer.
 
 The `MUST NOT` list above directly addresses this for easyreg.
 
@@ -267,11 +358,13 @@ it explicitly.
 ## Further Reading
 
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
-- [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
-- [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
+- [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (Apr 2026)
+- [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (Apr 2026)
+- [TDAD: Test-Driven Agentic Development](https://arxiv.org/abs/2603.17973) — arxiv:2603.17973 (Mar 2026); [secondary summary](https://thelgtm.dev/tdad-test-driven-agentic-development-reducing-code-regressions-by-70/)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
 - `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
-- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
+- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index (May)
+- `scld-code-reviewer: docs/research/2026-06-expert-insights.md` — June 2026 insights (TDAD, Trust Factory, Proposals 4–6)
 
 ---
 
@@ -281,3 +374,4 @@ it explicitly.
 |---|---|---|
 | 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
 | 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
+| 2026-06-18 | TDAD paper (arxiv:2603.17973); harness constitutive definition | Pattern 5 (diff-aware triage, proposed); TDAD background section; harness element table; TDAD in further reading; updated relationship section |
