@@ -7,7 +7,8 @@ Usage:
 """
 import os
 import sys
-from typing import Optional
+from pathlib import Path
+from typing import List, Optional
 
 from fastmcp import FastMCP
 
@@ -15,7 +16,7 @@ from fastmcp import FastMCP
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from easyreg.config import load_config, load_rules_file
-from easyreg.model import CaseResult, Verdict
+from easyreg.model import Case, CaseResult, Suite, Verdict
 from easyreg.orchestrator import (
     compare_cases,
     execute_cases,
@@ -23,6 +24,7 @@ from easyreg.orchestrator import (
     get_golden_status,
     golden_root,
     promote_cases,
+    resolve_path,
 )
 
 
@@ -56,6 +58,30 @@ def _case_result_to_dict(cr: CaseResult) -> dict:
         "diffs": list(cr.diffs),
         "errors": list(cr.errors),
     }
+
+
+def _case_is_affected(
+    case: Case,
+    suite: Suite,
+    changed_paths: List[Path],
+) -> bool:
+    """Return True if any changed file likely affects this case.
+
+    Checks command/input string references and golden directory containment.
+    Best-effort only — not a substitute for running the full suite.
+    """
+    targets = " ".join(filter(None, [case.command, case.input or ""]))
+    for p in changed_paths:
+        if str(p) in targets or p.name in targets:
+            return True
+    golden_dir = resolve_path(suite.golden_dir, case=case.name)
+    for p in changed_paths:
+        try:
+            p.relative_to(golden_dir)
+            return True
+        except ValueError:
+            pass
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -130,6 +156,44 @@ def golden_status(
     return {
         "golden_root": str(root),
         "cases": get_golden_status(suite),
+    }
+
+
+@mcp.tool(
+    description=(
+        "Given a list of changed files (e.g. from `git diff --name-only HEAD`), "
+        "return which regression cases are likely affected. "
+        "Approximation: a case is flagged when any changed file path appears in "
+        "its command or input string, or when a changed file is inside its golden dir. "
+        "Use for pre-run triage: get affected_cases, then pass each to run as case_name. "
+        "Skips unaffected cases for faster feedback on targeted changes. "
+        "Returns: affected_cases (list), all_cases (list), coverage (0.0–1.0). "
+        "NOTE: best-effort only — full suite remains authoritative."
+    )
+)
+def impact(
+    config_path: str,
+    changed_files: List[str],
+) -> dict:
+    """Identify regression cases likely affected by the given file changes.
+
+    Args:
+        config_path:   REQUIRED. Path to the suite JSON config file.
+        changed_files: REQUIRED. Changed file paths from git diff --name-only.
+    """
+    suite = load_config(config_path)
+    changed_paths = [Path(f) for f in changed_files]
+    affected = [
+        c.name for c in suite.cases
+        if _case_is_affected(c, suite, changed_paths)
+    ]
+    all_names = [c.name for c in suite.cases]
+    n = len(all_names)
+    return {
+        "affected_cases": affected,
+        "all_cases": all_names,
+        "coverage": round(len(affected) / n, 3) if n else 0.0,
+        "note": "best-effort; full suite run remains authoritative",
     }
 
 
