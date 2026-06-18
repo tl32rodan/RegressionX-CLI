@@ -52,10 +52,11 @@ pip install fastmcp
 | Tool | Purpose | Required params | Optional params |
 |---|---|---|---|
 | `regressionx_show_config` | Inspect suite config contents | `config_path` | — |
+| `regressionx_golden_status` | Check whether golden references exist | `config_path` | — |
+| `regressionx_impact` | Identify cases likely affected by changed files | `config_path`, `changed_files` | — |
 | `regressionx_run` | Execute cases and compare against golden | `config_path` | `case_name`, `parallel` |
 | `regressionx_compare` | Compare only (no re-execution) | `config_path` | `case_name` |
 | `regressionx_promote` | Promote output to golden | `config_path` | `case_name` |
-| `regressionx_golden_status` | Check whether golden references exist | `config_path` | — |
 
 ---
 
@@ -64,16 +65,21 @@ pip install fastmcp
 ### Standard workflow (follow this order strictly)
 
 ```
+Step 0: regressionx_impact        — (optional) identify affected cases from git diff
 Step 1: regressionx_show_config   — inspect the config; confirm config_path is correct
 Step 2: regressionx_golden_status — check whether golden references have been created
-Step 3: regressionx_run           — execute test cases
+Step 3: regressionx_run           — execute test cases (targeted or full)
 Step 4: regressionx_promote       — (only if verdict=NEW) create golden for the first time
 ```
+
+Step 0 is optional. Use it when `git diff --name-only` context is available and you
+want faster feedback by running only cases affected by the change.
 
 ### When to use which tool
 
 | Situation | Use | Do NOT use |
 |---|---|---|
+| "Changed files known; want targeted run" | `regressionx_impact` then `regressionx_run` per case | — |
 | "I want to run regression tests" | `regressionx_run` | ~~regressionx_compare~~ |
 | "Outputs already exist; just re-check the diff" | `regressionx_compare` | ~~regressionx_run~~ |
 | "Verdict is NEW; I need to create a golden" | `regressionx_promote` | — |
@@ -119,6 +125,22 @@ Step 4: regressionx_promote       — (only if verdict=NEW) create golden for th
 
 // ❌ Wrong — do not use "*" or "all"; just omit the parameter
 {"config_path": "examples/simple_suite.json", "case_name": "*"}
+```
+
+### changed_files (regressionx_impact only)
+
+- **Required** for `regressionx_impact`
+- Must be a **list of strings** (file paths from `git diff --name-only`)
+- Accepts relative or absolute paths
+- **Correct**: `["src/parser.py", "testdata/input.txt"]`
+- **Wrong**: `"src/parser.py"` (a string, not a list)
+
+```json
+// ✅ Correct
+{"config_path": "regression/suite.json", "changed_files": ["src/parser.py"]}
+
+// ❌ Wrong — must be a list, not a string
+{"config_path": "regression/suite.json", "changed_files": "src/parser.py"}
 ```
 
 ### parallel
@@ -170,6 +192,21 @@ Step 4: regressionx_promote       — (only if verdict=NEW) create golden for th
 
 - `diffs`: list of mismatched file paths (non-empty only when verdict is `FAIL`)
 - `errors`: list of error messages (non-empty only when verdict is `ERROR`)
+
+### regressionx_impact
+
+```json
+{
+  "affected_cases": ["parse_hex"],
+  "all_cases": ["parse_hex", "parse_oct", "parse_bin"],
+  "coverage": 0.333,
+  "note": "best-effort; full suite run remains authoritative"
+}
+```
+
+- `affected_cases`: subset of case names likely impacted by the changed files
+- `coverage`: fraction of all cases flagged (0.0 – 1.0)
+- If `coverage` is 1.0, run the full suite directly (all cases are affected)
 
 ### regressionx_promote
 
@@ -263,4 +300,29 @@ Agent reasoning: the user modified code and wants to check for regressions
 1. Call regressionx_run(config_path="examples/simple_suite.json")
    → Check summary: if all PASS, report "no regression detected"
    → If any FAIL, inspect the diffs field and report which files differ
+```
+
+### Example 3 — Diff-aware triage (targeted PR review)
+
+```
+Agent reasoning: PR modifies src/parser.py; want fast feedback without running
+all 20 cases in the suite
+
+1. Collect changed files from the PR diff:
+   changed_files = ["src/parser.py", "testdata/inputs/hex_input.txt"]
+
+2. Call regressionx_impact(
+       config_path="regression/suite.json",
+       changed_files=["src/parser.py", "testdata/inputs/hex_input.txt"]
+   )
+   → {"affected_cases": ["parse_hex", "parse_oct"], "coverage": 0.1}
+
+3. Call regressionx_run(config_path="regression/suite.json", case_name="parse_hex")
+   Call regressionx_run(config_path="regression/suite.json", case_name="parse_oct")
+   → Both PASS — no regression in the affected subset
+
+4. Report: "Targeted run (2/20 cases, coverage 10%) — all PASS.
+   Full suite recommended before merge."
+
+Note: if coverage is 1.0 (all cases affected), skip step 2 and run the full suite.
 ```
