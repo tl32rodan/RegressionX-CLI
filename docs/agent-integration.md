@@ -62,6 +62,42 @@ equally to golden files.
 
 ---
 
+## Background: Mutation Testing as Complementary Sensor (Böckeler, 2026)
+
+Source: [Maintainability Sensors for Coding Agents](https://martinfowler.com/articles/sensors-for-coding-agents.html)
+— Birgitta Böckeler, Thoughtworks (published via Fowler site, May–June 2026)
+
+Böckeler's research reveals a subtle failure mode that golden-file regression alone
+cannot catch: **agents can write tests that always pass regardless of logic changes**.
+The tests satisfy the line-coverage metric but provide no actual protection.
+
+**Mutation testing** detects this by injecting deliberate code faults ("mutants")
+and checking whether any test catches them. A SURVIVE% of 100% (all mutants survive
+undetected) means the test suite is effectively decorative.
+
+**Relationship to easyreg:**
+
+easyreg and mutation testing operate at different levels and are complementary:
+
+| Sensor | Level | What it verifies | Failure mode it catches |
+|---|---|---|---|
+| easyreg golden-file regression | System / output | Observable behavior preserved | Agent modifying output without notice |
+| Mutation testing (Mutmut, Stryker, PITest) | Unit / function | Unit tests actually detect logic changes | Agent writing tests that always pass |
+
+A project with both sensors closes two distinct failure modes. easyreg is the
+outer boundary; mutation testing is the inner boundary.
+
+**Practical guidance for projects using easyreg:**
+
+If your project also runs unit tests (as recommended), consider adding a mutation
+testing step to CI. A reasonable gate:
+- Mutation score < 50% → flag for human review before checkin
+- Mutation score = 0% (all mutants survive) → block; tests are not functioning
+
+This is advisory; easyreg does not require or invoke mutation testing.
+
+---
+
 ## Integration Patterns
 
 ### Pattern 1: Post-change regression gate
@@ -158,6 +194,26 @@ In TOP mode, the invariant is especially strict: **no agent may promote a golden
 or modify a golden without explicit human review**, because goldens are specifications,
 not incidental artifacts.
 
+### Pattern 5: Security-hardened CI (VibeSec pattern)
+
+Source: [The VibeSec Reckoning](https://martinfowler.com/articles/vibesec-reckoning.html) — Thoughtworks (2026)
+
+AI agents frequently introduce insecure configurations by default. easyreg can
+serve as a regression sensor for security-sensitive outputs (e.g., configuration
+files, API responses, permission schemas). Combined with a security context
+feedforward guide:
+
+1. **Security context file** (feedforward): explicitly list what the agent must
+   never produce — open CORS headers, missing auth headers, etc.
+2. **Golden files for security-sensitive outputs** (sensor): commit goldens for
+   outputs that include security-relevant fields; a regression signals a change
+   that must be human-reviewed.
+3. **CI gate**: treat any FAIL on security-sensitive cases as a hard block.
+
+This pattern does not require easyreg to understand security semantics — it
+treats security-sensitive outputs like any other golden, and human review of
+the diff provides the security judgment.
+
 ---
 
 ## Guidelines for Coding Agents Using easyreg
@@ -216,9 +272,10 @@ Unit tests (TDD/TOP) and easyreg regression tests are not substitutes:
 | Level | Tool | What it verifies | In TOP mode |
 |---|---|---|---|
 | Function / unit | TDD unit tests | Internal logic correctness | Developer-written specification |
+| Function / unit (quality check) | Mutation testing | Unit tests actually detect bugs | Signal that tests are not decorative |
 | System / output | easyreg goldens | Observable behavior preservation | Output-level specification |
 
-A complete harness has both. The specific failure mode Beck warns about — agents
+A complete harness has all three. The specific failure mode Beck warns about — agents
 deleting unit tests to make them "pass" — applies equally to golden references:
 an agent that modifies goldens to hide regressions is the same anti-pattern.
 
@@ -268,10 +325,13 @@ it explicitly.
 
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
+- [Maintainability Sensors for Coding Agents](https://martinfowler.com/articles/sensors-for-coding-agents.html) — Böckeler (2026)
+- [The VibeSec Reckoning](https://martinfowler.com/articles/vibesec-reckoning.html) — Thoughtworks (2026)
 - [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
 - `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
-- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
+- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index (through 2026-05-21)
+- `scld-code-reviewer: docs/research/2026-06-expert-insights.md` — June 2026 session (this session)
 
 ---
 
@@ -281,3 +341,4 @@ it explicitly.
 |---|---|---|
 | 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
 | 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
+| 2026-06-23 | Böckeler sensors (mutation testing); VibeSec Reckoning (Pattern 5); updated TDD/TOP table to include mutation testing tier | Mutation testing background section; Pattern 5 (VibeSec); 3-level comparison table |
