@@ -158,6 +158,76 @@ In TOP mode, the invariant is especially strict: **no agent may promote a golden
 or modify a golden without explicit human review**, because goldens are specifications,
 not incidental artifacts.
 
+### Pattern 5: VibeSec Security Hardening in CI
+
+The VibeSec Reckoning (Fowler/Thoughtworks, 2026) established that AI agents
+default to insecure configurations (open CORS, missing auth, over-broad IAM).
+Security is a sensor concern, not a prompt concern.
+
+For projects using easyreg in CI, the hardened pipeline is:
+
+```
+coding agent produces change
+        ↓
+automated security checks (static analysis, dependency scan)  ← SEC sensors
+        ↓
+easyreg run (output behavior preserved?)                      ← external quality sensor
+        ↓
+code review agent (/review)                                   ← inferential sensor
+        ↓
+/checkin gate
+```
+
+Security checks run *before* easyreg (cheaper; catch a distinct failure class).
+A FAIL in either layer blocks the checkin. The SEC protocol category in
+`scld-code-reviewer` provides the inferential security review on top.
+
+---
+
+## The Böckeler Sensor Quality Stack (2026)
+
+Source: [Birgitta Böckeler — Maintainability Sensors for Coding Agents](https://martinfowler.com/articles/sensors-for-coding-agents.html)
+(Thoughtworks Global Lead for AI-assisted Software Delivery, QCon London 2026)
+
+Böckeler defines three quality dimensions, each requiring a different sensor:
+
+| Quality Dimension | What it verifies | Sensor | easyreg? |
+|---|---|---|---|
+| **External quality** | Observable behavior at output boundary | Golden-file regression | ✓ **easyreg's lane** |
+| Internal quality | Code structure, coupling, complexity | Static analysis, linters | ✗ separate tools |
+| **Test quality** | Do tests actually protect anything? | **Mutation testing** | ✗ complementary tool |
+
+**easyreg covers external quality**: deterministic comparison of system outputs
+against golden references across code changes. This catches behavioral regressions
+at the boundary where the system meets the world.
+
+**Mutation testing** (e.g. `mutmut`, `cosmic-ray`, `stryker`) covers test quality:
+it deliberately introduces small bugs into the source code and verifies that the
+test suite catches them. Böckeler identifies this as the *strongest* available
+sensor — agents can write test suites that are always green but protect nothing,
+and only mutation testing exposes this.
+
+**Why both matter**: an agent can satisfy easyreg (output behavior preserved)
+while having a hollow test suite that would miss real regressions in a future
+change cycle. The layers are independent:
+
+```
+Unit tests (TDD/TOP)           ← specification for internal logic
+Mutation testing               ← verifies the unit tests are meaningful
+easyreg golden-file regression ← specification for observable system behavior
+Code review (/review)          ← inferential check across all dimensions
+```
+
+**Rippable harness principle** (Böckeler, QCon London 2026): design harness
+components to be easy to remove as models improve. Each sensor layer should have
+a stated removal or upgrade trigger — not permanent infrastructure. When Claude 5.x
+ships, some of the error-recovery logic in the current harness may become dead weight.
+
+**Status for SCLD**: easyreg (external quality) is the current correct first layer.
+Mutation testing (test quality) is deferred — requires the SCLD team to adopt a
+mutation testing tool. See Proposal 5 in
+`scld-code-reviewer/docs/references/ai-era-engineering.md`.
+
 ---
 
 ## Guidelines for Coding Agents Using easyreg
@@ -211,14 +281,15 @@ ground truth. The golden is only valid if a human confirmed it.
 
 Kent Beck (2026): "TDD is a superpower when working with AI agents."
 
-Unit tests (TDD/TOP) and easyreg regression tests are not substitutes:
+Unit tests (TDD/TOP), mutation testing, and easyreg regression tests are not substitutes:
 
 | Level | Tool | What it verifies | In TOP mode |
 |---|---|---|---|
 | Function / unit | TDD unit tests | Internal logic correctness | Developer-written specification |
+| Test suite validity | Mutation testing | Unit tests catch real bugs | Sensor for test quality |
 | System / output | easyreg goldens | Observable behavior preservation | Output-level specification |
 
-A complete harness has both. The specific failure mode Beck warns about — agents
+A complete harness has all three. The specific failure mode Beck warns about — agents
 deleting unit tests to make them "pass" — applies equally to golden references:
 an agent that modifies goldens to hide regressions is the same anti-pattern.
 
@@ -268,10 +339,13 @@ it explicitly.
 
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
+- [Maintainability Sensors for Coding Agents](https://martinfowler.com/articles/sensors-for-coding-agents.html) — Böckeler (2026)
 - [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
+- [The VibeSec Reckoning](https://martinfowler.com/articles/vibesec-reckoning.html) — Fowler/Thoughtworks (2026)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
 - `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
-- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
+- `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — expert insights index (May 2026)
+- `scld-code-reviewer: docs/research/2026-06-expert-insights.md` — expert insights index (June 2026)
 
 ---
 
@@ -281,3 +355,4 @@ it explicitly.
 |---|---|---|
 | 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
 | 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
+| 2026-06-30 | Böckeler sensor stack; VibeSec security hardening; rippable harness | Pattern 5 (VibeSec CI), Böckeler Sensor Quality Stack section, updated TDD/TOP/mutation comparison table, new Further Reading entries |
