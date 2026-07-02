@@ -207,6 +207,36 @@ ground truth. The golden is only valid if a human confirmed it.
 
 ---
 
+## Why a Computational Sensor Matters More as Agent Volume Grows (2026-07-02)
+
+Two 2026 findings, surfaced in `scld-code-reviewer`'s research pass, give
+independent quantitative grounding for why `easyreg` (a computational,
+non-human-attention-consuming sensor) is not just a nice-to-have alongside
+LLM-based review:
+
+- **The Productivity-Reliability Paradox**
+  ([arxiv:2605.01160](https://arxiv.org/abs/2605.01160), May 2026)
+  documents telemetry showing agent adoption drives **98% more pull
+  requests but 91% longer review times** absent specification/verification
+  discipline. Its headline finding: "specification discipline, not model
+  capability, is the binding constraint on AI-assisted software
+  dependability." A deterministic golden-file check is exactly the kind of
+  discipline that keeps review time from scaling with PR volume — it
+  either passes unattended or surfaces a concrete, bounded diff for a
+  human to look at, never a vague "please re-read everything."
+- **Martin Fowler's "Agentic Programming"**
+  ([martinfowler.com/bliki/AgenticProgramming.html](https://martinfowler.com/bliki/AgenticProgramming.html),
+  May 2026) frames human review attention as a non-parallelizable
+  resource (the "GIL" analogy — you are the GIL of your AI agents).
+  `easyreg` runs unattended and only asks for that scarce attention when
+  it finds an actual behavior change; an inferential (LLM) reviewer
+  cannot make that same unattended-by-default guarantee.
+
+Together these strengthen, rather than change, the existing
+"complementary sensors" design in this document: the computational sensor
+is not a lesser substitute for semantic review, it is the layer that keeps
+semantic review's cost from growing with agent throughput.
+
 ## Relationship to TDD and TOP
 
 Kent Beck (2026): "TDD is a superpower when working with AI agents."
@@ -264,14 +294,33 @@ it explicitly.
 
 ---
 
+## Possible Future Synergy: Adversarial Review (not yet proposed as a change here)
+
+`scld-code-reviewer`'s 2026-07-02 research pass surfaced an external
+reference pattern (`advocatus-diaboli`, from
+`Habitat-Thinking/ai-literacy-superpowers`) — a read-only adversarial
+reviewer that raises objections against a diff without fixing it or
+disposing of its own findings. If that pattern is ever adopted (see
+`scld-code-reviewer: docs/research/adversarial-review-proposal.md` — an
+open option analysis, not a decision), the natural integration point
+would be: the adversarial pass reads `regression.md` alongside the diff,
+so an objection like "this change might have broken X" is backed by
+`easyreg`'s objective PASS/FAIL/NEW data rather than the agent's own
+unverified claim. No change proposed to easyreg today — noted here only
+so the idea isn't rediscovered from scratch if that proposal is ever
+accepted.
+
 ## Further Reading
 
 - [easyreg SKILL.md](../SKILL.md) — MCP tool reference for agents
 - [Harness engineering for coding agent users](https://martinfowler.com/articles/harness-engineering.html) — Fowler (2026)
 - [Test-Oriented Programming: rethinking coding for the GenAI era](https://arxiv.org/abs/2604.08102) — arxiv:2604.08102 (April 2026)
+- [The Productivity-Reliability Paradox](https://arxiv.org/abs/2605.01160) — arxiv:2605.01160 (May 2026)
+- [bliki: Agentic Programming](https://martinfowler.com/bliki/AgenticProgramming.html) — Fowler (May 2026)
 - `scld-code-reviewer: docs/architecture/ADR-002-regression-personality-option-a.md` — regression personality full design
 - `scld-code-reviewer: docs/research/regression-personality-proposal.md` — option analysis and history
 - `scld-code-reviewer: docs/research/2026-05-expert-insights.md` — full expert insights index
+- `scld-code-reviewer: docs/research/adversarial-review-proposal.md` — possible future synergy point (open, undecided)
 
 ---
 
@@ -281,3 +330,4 @@ it explicitly.
 |---|---|---|
 | 2026-05-18 | Initial agent integration guide created | All patterns 1–3, guidelines, promotion protocol |
 | 2026-05-21 | TOP paradigm (arxiv:2604.08102) added | Pattern 4, TOP grounding for MUST NOT rules, updated TDD/TOP comparison table |
+| 2026-07-02 | Cross-repo research sync from `scld-code-reviewer`'s 2026-07-02 pass | Added Productivity-Reliability Paradox + Agentic Programming grounding for why the computational sensor's unattended-by-default property matters as agent PR volume grows; noted (not proposed) a possible future `advocatus-diaboli` integration point |
